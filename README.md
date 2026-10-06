@@ -34,21 +34,51 @@ cd frontend && npm test -- --watch=false
 
 ```
 web/         Controladores REST (solo HTTP: validan y delegan)
-service/     Reglas de negocio y transacciones
-repository/  Acceso a datos (Spring Data JPA)
-domain/      Entidades con su propio comportamiento (Book.borrowCopy, Loan.isOverdue…)
-dto/         Contratos de entrada/salida de la API (records)
+service/     Casos de uso y transacciones; devuelven DTOs, nunca entidades
+repository/  Acceso a datos (Spring Data JPA, consultas JPQL con fetch join y proyecciones)
+domain/      Entidades que protegen sus invariantes (Book.borrowCopy, Loan.markReturned…)
+dto/         Contratos de entrada/salida de la API (records validados)
+config/      Parámetros de negocio tipados y validados (LibraryProperties)
 exception/   Errores de negocio y manejo global -> respuestas JSON uniformes
 ```
 
-Decisiones: las entidades nunca se exponen directamente (DTOs), el reloj se inyecta (`Clock`)
-para poder probar fechas, y los errores devuelven `{status, message, fields?}`
-con 400 (validación), 404 (no existe) o 409 (regla de negocio).
+### Decisiones técnicas
+
+- **DTOs mapeados dentro de la transacción** y `open-in-view=false`: la capa web nunca toca
+  entidades, así que no hay `LazyInitializationException` ni consultas ocultas al serializar.
+- **Sin N+1:** el historial de préstamos se carga con `join fetch`, y las relaciones perezosas
+  se agrupan por lotes (`default_batch_fetch_size`).
+- **Estadísticas en la BD:** `COUNT/GROUP BY` con `LIMIT` y proyección directa a `StatEntry`;
+  no se cargan entidades en memoria.
+- **Índices** sobre las columnas que usan las reglas y los informes (préstamos activos por
+  usuario, por libro y vencidos).
+- **Concurrencia:** `@Version` (bloqueo optimista) en `Book` y `Loan`. Dos préstamos simultáneos
+  del último ejemplar, o una doble devolución, terminan en 409 en lugar de corromper el stock.
+  El correo único se garantiza también con una restricción en la BD.
+- **Reglas configurables** (`library.loans.days`, `library.loans.max-active`), validadas al
+  arrancar; también se pueden fijar con variables de entorno.
+- **Reloj inyectado (`Clock`)** para tests deterministas con fechas.
+- **Errores uniformes** `{timestamp, status, message, path, fields?}`: 400 (validación o JSON
+  mal formado), 404, 409 (regla de negocio o concurrencia) y 500 genérico sin filtrar detalles
+  internos (la traza completa va al log).
+- **Operación:** `/actuator/health` (con *probes* de liveness y readiness), apagado ordenado,
+  compresión de respuestas JSON y logs de los eventos de negocio.
+
+### Pruebas
+
+- Unitarias (dominio y `LoanService`, con mocks y reloj fijo): cada regla por separado.
+- Integración (`LibraryApiIntegrationTest`, MockMvc + H2): HTTP → JPA de extremo a extremo,
+  con la misma configuración que producción (`open-in-view=false`).
+
+### Siguientes pasos para producción
+
+Migraciones con Flyway en lugar de `ddl-auto`, PostgreSQL, paginación del historial de
+préstamos, autenticación (Spring Security + JWT) y documentación OpenAPI.
 
 ## Reglas de préstamos
 
-- Plazo de **14 días**.
-- Máximo **3 préstamos activos** por usuario.
+- Plazo de **14 días** (configurable).
+- Máximo **3 préstamos activos** por usuario (configurable).
 - Un usuario con **préstamos vencidos** no puede pedir más libros.
 - Solo se presta si hay **ejemplares disponibles** (cada libro tiene total y disponibles).
 - No se puede eliminar un libro o usuario que tenga historial de préstamos.

@@ -3,6 +3,7 @@ package com.biblioteca.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.biblioteca.exception.BusinessRuleException;
 import org.junit.jupiter.api.Test;
 
 class BookTest {
@@ -25,7 +26,7 @@ class BookTest {
         book.borrowCopy();
 
         assertThatThrownBy(() -> book.update("Dune", "Frank Herbert", "Ciencia ficción", 1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
@@ -34,6 +35,6 @@ class BookTest {
         book.borrowCopy();
 
         assertThat(book.isAvailable()).isFalse();
-        assertThatThrownBy(book::borrowCopy).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(book::borrowCopy).isInstanceOf(BusinessRuleException.class);
     }
 }
