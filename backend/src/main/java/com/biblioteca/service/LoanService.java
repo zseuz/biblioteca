@@ -56,10 +56,17 @@ public class LoanService {
 
     @Transactional(readOnly = true)
     public List<LoanResponse> list() {
-        LocalDate today = today();
+        LocalDate today = today(); // una sola fecha para todo el listado: estados coherentes entre sí
         return loans.findAllWithDetails().stream().map(l -> LoanResponse.from(l, today)).toList();
     }
 
+    /**
+     * Presta un ejemplar aplicando las reglas descritas en la clase.
+     *
+     * @return el préstamo creado, con fecha límite calculada a partir del plazo configurado
+     * @throws NotFoundException     si el libro o el usuario no existen
+     * @throws BusinessRuleException si se incumple alguna regla de préstamo
+     */
     public LoanResponse lend(LoanRequest r) {
         Book book = books.findById(r.bookId())
                 .orElseThrow(() -> new NotFoundException("Libro no encontrado: " + r.bookId()));
@@ -85,6 +92,14 @@ public class LoanService {
         return LoanResponse.from(loan, today);
     }
 
+    /**
+     * Registra la devolución con la fecha de hoy y repone el ejemplar.
+     *
+     * <p>Se carga con {@code join fetch} porque la respuesta incluye título y nombre de usuario.
+     *
+     * @throws NotFoundException     si el préstamo no existe
+     * @throws BusinessRuleException si ya había sido devuelto
+     */
     public LoanResponse giveBack(Long loanId) {
         Loan loan = loans.findByIdWithDetails(loanId)
                 .orElseThrow(() -> new NotFoundException("Préstamo no encontrado: " + loanId));
