@@ -28,17 +28,23 @@ public class LoanController {
         this.service = service;
     }
 
+    /** {@code GET /api/loans}: historial completo, del más reciente al más antiguo. 200. */
     @GetMapping
     public List<LoanResponse> list() {
         return service.list();
     }
 
+    /**
+     * {@code POST /api/loans}: 201 con el préstamo creado; 400 (validación), 404 (libro o
+     * usuario inexistente) o 409 (sin ejemplares, préstamos vencidos o límite alcanzado).
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public LoanResponse lend(@Valid @RequestBody LoanRequest request) {
         return service.lend(request);
     }
 
+    /** {@code POST /api/loans/{id}/return}: 200, 404, o 409 si ya estaba devuelto. */
     @PostMapping("/{id}/return")
     public LoanResponse giveBack(@PathVariable Long id) {
         return service.giveBack(id);

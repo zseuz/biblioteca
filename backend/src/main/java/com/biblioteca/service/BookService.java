@@ -40,17 +40,29 @@ public class BookService {
         return books.search(q).stream().map(BookResponse::from).toList();
     }
 
+    /**
+     * Obtiene un libro por su identificador.
+     *
+     * @throws NotFoundException si el libro no existe
+     */
     @Transactional(readOnly = true)
     public BookResponse get(Long id) {
         return BookResponse.from(find(id));
     }
 
+    /** Da de alta un libro con todos sus ejemplares disponibles. */
     public BookResponse create(BookRequest r) {
         Book book = books.save(new Book(r.title().trim(), r.author().trim(), r.genre().trim(), r.totalCopies()));
         log.info("Libro creado id={} título='{}'", book.getId(), book.getTitle());
         return BookResponse.from(book);
     }
 
+    /**
+     * Actualiza los datos de un libro conservando los ejemplares prestados.
+     *
+     * @throws NotFoundException     si el libro no existe
+     * @throws BusinessRuleException si el nuevo total es menor que los ejemplares prestados
+     */
     public BookResponse update(Long id, BookRequest r) {
         Book book = find(id);
         book.update(r.title().trim(), r.author().trim(), r.genre().trim(), r.totalCopies());
