@@ -19,16 +19,24 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
     @Query("select l from Loan l join fetch l.book join fetch l.member where l.id = :id")
     Optional<Loan> findByIdWithDetails(Long id);
 
+    // Consultas derivadas del nombre del método. "ReturnDateIsNull" equivale a "préstamo activo".
+
+    /** Préstamos activos del usuario (regla del máximo simultáneo). */
     long countByMemberIdAndReturnDateIsNull(Long memberId);
 
+    /** ¿Tiene el usuario algún préstamo activo con fecha límite anterior a {@code date}? */
     boolean existsByMemberIdAndReturnDateIsNullAndDueDateBefore(Long memberId, LocalDate date);
 
+    /** ¿Tiene el usuario historial de préstamos? (impide su eliminación) */
     boolean existsByMemberId(Long memberId);
 
+    /** ¿Tiene el libro historial de préstamos? (impide su eliminación) */
     boolean existsByBookId(Long bookId);
 
+    /** Total de préstamos activos. */
     long countByReturnDateIsNull();
 
+    /** Total de préstamos activos vencidos a la fecha {@code date}. */
     long countByReturnDateIsNullAndDueDateBefore(LocalDate date);
 
     // Estadísticas: agregación y límite resueltos en la BD; solo viajan las filas necesarias.

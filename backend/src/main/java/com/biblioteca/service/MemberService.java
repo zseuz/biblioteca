@@ -36,11 +36,17 @@ public class MemberService {
         this.loans = loans;
     }
 
+    /** Todos los usuarios ordenados alfabéticamente. */
     @Transactional(readOnly = true)
     public List<MemberResponse> list() {
         return members.findAll(Sort.by("name")).stream().map(MemberResponse::from).toList();
     }
 
+    /**
+     * Registra un usuario.
+     *
+     * @throws BusinessRuleException si el correo ya está registrado
+     */
     public MemberResponse create(MemberRequest r) {
         if (members.existsByEmail(Member.normalize(r.email()))) {
             throw new BusinessRuleException(DUPLICATE_EMAIL);
@@ -50,6 +56,12 @@ public class MemberService {
         return MemberResponse.from(member);
     }
 
+    /**
+     * Actualiza nombre y correo de un usuario.
+     *
+     * @throws NotFoundException     si el usuario no existe
+     * @throws BusinessRuleException si el correo pertenece a otro usuario
+     */
     public MemberResponse update(Long id, MemberRequest r) {
         Member member = find(id);
         if (members.existsByEmailAndIdNot(Member.normalize(r.email()), id)) {
@@ -59,7 +71,12 @@ public class MemberService {
         return MemberResponse.from(member);
     }
 
-    /** Elimina un usuario sin historial de préstamos (mismo criterio de trazabilidad que los libros). */
+    /**
+     * Elimina un usuario sin historial de préstamos (mismo criterio de trazabilidad que los libros).
+     *
+     * @throws NotFoundException     si el usuario no existe
+     * @throws BusinessRuleException si tiene préstamos registrados
+     */
     public void delete(Long id) {
         Member member = find(id);
         if (loans.existsByMemberId(id)) {
