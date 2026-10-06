@@ -8,9 +8,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
 
+    /**
+     * Búsqueda parcial e insensible a mayúsculas en título, autor y género.
+     *
+     * @param q texto ya recortado; cadena vacía devuelve todo el catálogo
+     */
     @Query("""
             select b from Book b
-            where :q is null or :q = ''
+            where :q = ''
                or lower(b.title) like lower(concat('%', :q, '%'))
                or lower(b.author) like lower(concat('%', :q, '%'))
                or lower(b.genre) like lower(concat('%', :q, '%'))

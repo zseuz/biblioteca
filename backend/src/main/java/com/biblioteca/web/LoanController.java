@@ -4,38 +4,43 @@ import com.biblioteca.dto.LoanRequest;
 import com.biblioteca.dto.LoanResponse;
 import com.biblioteca.service.LoanService;
 import jakarta.validation.Valid;
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Préstamos. La devolución es una acción ({@code POST /{id}/return}) y no un {@code PUT}
+ * genérico: el cliente no puede fijar fechas ni estados arbitrarios, solo pedir la transición.
+ */
 @RestController
 @RequestMapping("/api/loans")
 public class LoanController {
 
     private final LoanService service;
-    private final Clock clock;
 
-    public LoanController(LoanService service, Clock clock) {
+    public LoanController(LoanService service) {
         this.service = service;
-        this.clock = clock;
     }
 
     @GetMapping
     public List<LoanResponse> list() {
-        LocalDate today = LocalDate.now(clock);
-        return service.list().stream().map(l -> LoanResponse.from(l, today)).toList();
+        return service.list();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public LoanResponse lend(@Valid @RequestBody LoanRequest request) {
-        return LoanResponse.from(service.lend(request), LocalDate.now(clock));
+        return service.lend(request);
     }
 
     @PostMapping("/{id}/return")
     public LoanResponse giveBack(@PathVariable Long id) {
-        return LoanResponse.from(service.giveBack(id), LocalDate.now(clock));
+        return service.giveBack(id);
     }
 }
