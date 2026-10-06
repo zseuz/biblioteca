@@ -7,15 +7,22 @@ import com.biblioteca.repository.BookRepository;
 import com.biblioteca.repository.MemberRepository;
 import com.biblioteca.service.LoanService;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
-/** Datos de ejemplo para poder probar la app sin cargar nada a mano. */
+/**
+ * Datos de demostración para poder probar la aplicación sin cargar nada a mano.
+ * Solo se ejecuta con la BD vacía y nunca en el perfil {@code test}.
+ */
 @Configuration
 @Profile("!test")
 class DataSeeder {
+
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     @Bean
     CommandLineRunner seed(BookRepository books, MemberRepository members, LoanService loans) {
@@ -37,7 +44,8 @@ class DataSeeder {
             loans.lend(new LoanRequest(b.get(0).getId(), m.get(0).getId()));
             loans.lend(new LoanRequest(b.get(2).getId(), m.get(0).getId()));
             loans.lend(new LoanRequest(b.get(0).getId(), m.get(1).getId()));
-            loans.giveBack(loans.lend(new LoanRequest(b.get(4).getId(), m.get(2).getId())).getId());
+            loans.giveBack(loans.lend(new LoanRequest(b.get(4).getId(), m.get(2).getId())).id());
+            log.info("Datos de demostración cargados");
         };
     }
 }
