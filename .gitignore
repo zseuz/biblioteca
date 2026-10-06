@@ -8,3 +8,4 @@ HELP.md
 *.log
 *.mv.db
 *.trace.db
+data/
