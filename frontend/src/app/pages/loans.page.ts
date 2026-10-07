@@ -24,6 +24,7 @@ import {
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
 import { PaginatorComponent } from '../shared/paginator.component';
+import { renewalBlockedReason } from '../core/renewal';
 import { LoanRepeat, LoanRepeatDialogComponent } from './loan-repeat-dialog.component';
 import { LoanRenewalsDialogComponent } from './loan-renewals-dialog.component';
 import { messageFor } from '../core/error.interceptor';
@@ -730,7 +731,7 @@ export class LoansPage implements OnInit {
    */
   readonly renewBlocked = computed(() => {
     const loan = this.loanToRenew();
-    return loan ? this.renewBlockedReason(loan) : null;
+    return loan ? renewalBlockedReason(loan) : null;
   });
 
   /** Préstamo cuyo historial de renovaciones se está viendo, y el historial cargado. */
@@ -998,23 +999,6 @@ export class LoansPage implements OnInit {
     });
   }
 
-  /**
-   * Un préstamo se renueva como mucho una vez al día, y uno registrado hoy ya tiene el plazo
-   * completo. Devuelve el motivo para informarlo sin llamar al servidor, o {@code null}.
-   */
-  private renewBlockedReason(loan: Loan): string | null {
-    const today = this.todayIso();
-    const due = this.formatDate(loan.dueDate);
-    if (loan.lastRenewedOn === today) {
-      const at = loan.lastRenewedAt ? ` a las ${loan.lastRenewedAt.slice(11, 16)}` : '';
-      return `El préstamo de ${loan.bookTitle} ya se renovó hoy${at} y vence el ${due}. Podrá renovarse de nuevo a partir de mañana.`;
-    }
-    if (loan.loanDate === today) {
-      return `El préstamo de ${loan.bookTitle} se registró hoy y ya tiene el plazo completo (vence el ${due}). Podrá renovarse a partir de mañana.`;
-    }
-    return null;
-  }
-
   /** Abre el historial de renovaciones (préstamo inicial y cada renovación). */
   openHistory(loan: Loan): void {
     this.history.set(null);
@@ -1025,12 +1009,6 @@ export class LoansPage implements OnInit {
       },
       error: () => this.historyLoan.set(null),
     });
-  }
-
-  /** Fecha local de hoy en formato ISO ("2026-10-07"). */
-  private todayIso(): string {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   private notifyRenewed(loan: Loan): void {

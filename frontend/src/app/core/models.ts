@@ -79,6 +79,11 @@ export interface Loan {
   lastRenewedOn?: string | null;
   /** Fecha y hora de la última renovación ("2026-10-07T10:42:05"); puede faltar en renovaciones antiguas. */
   lastRenewedAt?: string | null;
+  /**
+   * Primer día en que se puede renovar (solo cuando faltan pocos días para el vencimiento);
+   * {@code null} si el préstamo ya fue devuelto.
+   */
+  renewableFrom?: string | null;
 }
 
 /** Una renovación del historial. */
