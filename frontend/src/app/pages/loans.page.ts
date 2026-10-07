@@ -1,78 +1,277 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { Book, Loan, LoanStatus, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
+import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
+import { ComboboxComponent, ComboboxOption } from '../shared/combobox.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { IconComponent } from '../shared/icon.component';
+import { ModalComponent } from '../shared/modal.component';
+import { SkeletonComponent } from '../shared/skeleton.component';
 
-const STATUS_LABEL: Record<LoanStatus, string> = {
-  ACTIVE: 'Activo',
-  OVERDUE: 'Vencido',
-  RETURNED: 'Devuelto',
-};
-const STATUS_CLASS: Record<LoanStatus, string> = {
-  ACTIVE: 'ok',
-  OVERDUE: 'bad',
-  RETURNED: 'muted',
-};
+export type LoanFilterStatus = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'RETURNED';
+export type LoanSortField = 'bookTitle' | 'memberName' | 'loanDate' | 'dueDate' | 'status';
+export type SortOrder = 'asc' | 'desc';
 
 @Component({
   selector: 'app-loans-page',
-  imports: [ReactiveFormsModule],
+  imports: [
+    ReactiveFormsModule,
+    IconComponent,
+    ActionMenuComponent,
+    ComboboxComponent,
+    ModalComponent,
+    ConfirmDialogComponent,
+    EmptyStateComponent,
+    SkeletonComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>Préstamos</h1>
+    <!-- Encabezado de página -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Gestión de Préstamos</h1>
+        <p class="page-desc">
+          Control de circulación de libros, plazos de devolución y préstamos vencidos.
+        </p>
+      </div>
+      <button type="button" class="btn btn-primary" (click)="openCreateModal()">
+        <app-icon name="plus" [size]="16" />
+        Registrar préstamo
+      </button>
+    </div>
 
-    <section class="card" aria-labelledby="form-title">
-      <h2 id="form-title">Registrar préstamo</h2>
-      <p class="empty">Reglas: 14 días de plazo, máximo 3 préstamos activos por usuario y sin préstamos vencidos pendientes.</p>
-      <form [formGroup]="form" (ngSubmit)="lend()" novalidate>
-        <div class="grid">
-          <div>
-            <label for="member">Usuario</label>
-            <select id="member" formControlName="memberId" [class.invalid]="invalid('memberId')" [attr.aria-invalid]="invalid('memberId')">
-              <option value="">Selecciona un usuario</option>
-              @for (m of members(); track m.id) { <option [value]="m.id">{{ m.name }}</option> }
-            </select>
-            @if (invalid('memberId')) { <p class="error">Selecciona un usuario.</p> }
-          </div>
-          <div>
-            <label for="book">Libro</label>
-            <select id="book" formControlName="bookId" [class.invalid]="invalid('bookId')" [attr.aria-invalid]="invalid('bookId')">
-              <option value="">Selecciona un libro</option>
-              @for (b of availableBooks(); track b.id) { <option [value]="b.id">{{ b.title }} ({{ b.availableCopies }} disp.)</option> }
-            </select>
-            @if (invalid('bookId')) { <p class="error">Selecciona un libro.</p> }
-          </div>
+    <!-- Métricas rápidas de préstamos -->
+    <div class="kpi-strip">
+      <div class="kpi-chip">
+        <div class="kpi-chip-icon"><app-icon name="loans" [size]="18" /></div>
+        <div>
+          <span class="kpi-chip-val">{{ activeLoansCount() }}</span>
+          <span class="kpi-chip-lbl">Préstamos activos</span>
         </div>
-        <div class="actions">
-          <button class="primary" type="submit" [disabled]="saving()">Prestar libro</button>
+      </div>
+      <div class="kpi-chip">
+        <div class="kpi-chip-icon" [class.danger]="overdueLoansCount() > 0">
+          <app-icon name="alert" [size]="18" />
         </div>
-      </form>
-    </section>
+        <div>
+          <span class="kpi-chip-val" [class.alert-val]="overdueLoansCount() > 0">{{
+            overdueLoansCount()
+          }}</span>
+          <span class="kpi-chip-lbl">Préstamos vencidos</span>
+        </div>
+      </div>
+      <div class="kpi-chip">
+        <div class="kpi-chip-icon success"><app-icon name="check" [size]="18" /></div>
+        <div>
+          <span class="kpi-chip-val">{{ returnedLoansCount() }}</span>
+          <span class="kpi-chip-lbl">Devueltos con éxito</span>
+        </div>
+      </div>
+    </div>
 
-    <section class="card" aria-labelledby="list-title">
-      <h2 id="list-title">Historial</h2>
+    <!-- Barra de filtros y búsqueda -->
+    <div class="toolbar card">
+      <div class="toolbar-left">
+        <div class="search-input-wrap">
+          <app-icon name="search" [size]="16" class="search-icon" />
+          <label for="search-loans" class="sr-only">Buscar préstamos</label>
+          <input
+            id="search-loans"
+            type="search"
+            placeholder="Buscar por libro o usuario..."
+            [value]="searchTerm()"
+            (input)="onSearchInput($event)"
+          />
+          @if (searchTerm()) {
+            <button
+              type="button"
+              class="clear-search-btn"
+              (click)="searchTerm.set('')"
+              aria-label="Limpiar búsqueda"
+            >
+              <app-icon name="close" [size]="14" />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <div class="filter-pills" role="radiogroup" aria-label="Filtrar préstamos">
+          <button
+            type="button"
+            class="pill-btn"
+            [class.active]="statusFilter() === 'ALL'"
+            (click)="statusFilter.set('ALL')"
+          >
+            Todos ({{ loans().length }})
+          </button>
+          <button
+            type="button"
+            class="pill-btn"
+            [class.active]="statusFilter() === 'ACTIVE'"
+            (click)="statusFilter.set('ACTIVE')"
+          >
+            Activos ({{ activeLoansCount() }})
+          </button>
+          <button
+            type="button"
+            class="pill-btn"
+            [class.active]="statusFilter() === 'OVERDUE'"
+            [class.pill-danger]="overdueLoansCount() > 0"
+            (click)="statusFilter.set('OVERDUE')"
+          >
+            Vencidos ({{ overdueLoansCount() }})
+          </button>
+          <button
+            type="button"
+            class="pill-btn"
+            [class.active]="statusFilter() === 'RETURNED'"
+            (click)="statusFilter.set('RETURNED')"
+          >
+            Devueltos ({{ returnedLoansCount() }})
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de historial -->
+    <section class="loans-section" aria-labelledby="loans-heading">
+      <h2 id="loans-heading" class="sr-only">Historial de préstamos</h2>
+
       @if (loading()) {
-        <p class="empty">Cargando…</p>
-      } @else if (loans().length === 0) {
-        <p class="empty">Todavía no hay préstamos.</p>
+        <div class="card p-3">
+          <div class="skeleton-stack">
+            <app-skeleton height="2.2rem" />
+            <app-skeleton height="2.2rem" />
+            <app-skeleton height="2.2rem" />
+            <app-skeleton height="2.2rem" />
+          </div>
+        </div>
+      } @else if (filteredLoans().length === 0) {
+        @if (loans().length === 0) {
+          <app-empty-state
+            icon="loans"
+            title="Todavía no hay préstamos"
+            message="No se ha registrado ningún préstamo en el sistema todavía."
+            actionLabel="Registrar primer préstamo"
+            (action)="openCreateModal()"
+          />
+        } @else {
+          <app-empty-state
+            icon="search"
+            title="Sin préstamos coincidentes"
+            message="No se encontraron registros con los filtros seleccionados."
+            actionLabel="Limpiar filtros"
+            (action)="resetFilters()"
+          />
+        }
       } @else {
         <div class="table-wrap">
-          <table>
-            <caption class="sr-only">Lista de préstamos</caption>
-            <thead><tr><th>Libro</th><th>Usuario</th><th>Préstamo</th><th>Vence</th><th>Devuelto</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+          <table class="loans-table">
+            <caption class="sr-only">
+              Lista de préstamos
+            </caption>
+            <thead>
+              <tr>
+                <th class="sortable" (click)="toggleSort('bookTitle')">
+                  Libro
+                  <span class="sort-icon"
+                    ><app-icon [name]="getSortIcon('bookTitle')" [size]="13"
+                  /></span>
+                </th>
+                <th class="sortable" (click)="toggleSort('memberName')">
+                  Usuario
+                  <span class="sort-icon"
+                    ><app-icon [name]="getSortIcon('memberName')" [size]="13"
+                  /></span>
+                </th>
+                <th class="sortable" (click)="toggleSort('loanDate')">
+                  Préstamo
+                  <span class="sort-icon"
+                    ><app-icon [name]="getSortIcon('loanDate')" [size]="13"
+                  /></span>
+                </th>
+                <th class="sortable" (click)="toggleSort('dueDate')">
+                  Vence
+                  <span class="sort-icon"
+                    ><app-icon [name]="getSortIcon('dueDate')" [size]="13"
+                  /></span>
+                </th>
+                <th class="col-returned">Devuelto</th>
+                <th class="sortable" (click)="toggleSort('status')">
+                  Estado
+                  <span class="sort-icon"
+                    ><app-icon [name]="getSortIcon('status')" [size]="13"
+                  /></span>
+                </th>
+                <th class="col-actions"><span class="sr-only">Acciones</span></th>
+              </tr>
+            </thead>
             <tbody>
-              @for (l of loans(); track l.id) {
-                <tr>
-                  <td>{{ l.bookTitle }}</td>
-                  <td>{{ l.memberName }}</td>
-                  <td>{{ l.loanDate }}</td>
-                  <td>{{ l.dueDate }}</td>
-                  <td>{{ l.returnDate ?? '—' }}</td>
-                  <td><span class="badge" [class]="'badge ' + statusClass(l.status)">{{ statusLabel(l.status) }}</span></td>
-                  <td>
+              @for (l of filteredLoans(); track l.id) {
+                <tr [class.row-overdue]="l.status === 'OVERDUE'">
+                  <td class="col-book">
+                    <div class="loan-book-cell">
+                      <div class="book-mini-icon"><app-icon name="book" [size]="14" /></div>
+                      <strong class="loan-book-title">{{ l.bookTitle }}</strong>
+                    </div>
+                  </td>
+                  <td class="col-user">
+                    <div class="loan-user-cell">
+                      <span class="loan-user-avatar">{{ getInitials(l.memberName) }}</span>
+                      <span>{{ l.memberName }}</span>
+                    </div>
+                  </td>
+                  <td class="col-loan" data-label="Préstamo">
+                    <span class="date-tag">{{ formatDate(l.loanDate) }}</span>
+                  </td>
+                  <td class="col-due" data-label="Vence">
+                    <div class="due-date-cell">
+                      <span class="date-tag" [class.due-alert]="l.status === 'OVERDUE'">
+                        {{ formatDate(l.dueDate) }}
+                      </span>
+                      @if (l.status !== 'RETURNED') {
+                        <span class="due-subtext" [class.sub-danger]="l.status === 'OVERDUE'">
+                          {{ getDaysRelativeText(l.dueDate, l.status) }}
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td class="col-returned">
+                    @if (l.returnDate) {
+                      <span class="date-tag muted">{{ formatDate(l.returnDate) }}</span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td class="col-status">
+                    <span class="badge" [class]="statusClass(l.status)">
+                      <span class="dot"></span>
+                      {{ statusLabel(l.status) }}
+                    </span>
+                    <!-- Cuando la columna Devuelto se oculta, la fecha aparece bajo el estado -->
+                    @if (l.returnDate) {
+                      <span class="returned-inline">el {{ formatDate(l.returnDate) }}</span>
+                    }
+                  </td>
+                  <td class="col-actions">
                     @if (l.status !== 'RETURNED') {
-                      <button type="button" (click)="giveBack(l)" [attr.aria-label]="'Registrar devolución de ' + l.bookTitle">Devolver</button>
+                      <app-action-menu
+                        [items]="activeLoanActions"
+                        [label]="'Acciones para el préstamo de ' + l.bookTitle"
+                        (selected)="onAction($event, l)"
+                      />
                     }
                   </td>
                 </tr>
@@ -82,6 +281,292 @@ const STATUS_CLASS: Record<LoanStatus, string> = {
         </div>
       }
     </section>
+
+    <!-- Modal Registrar Préstamo -->
+    <app-modal
+      [open]="isModalOpen()"
+      title="Registrar nuevo préstamo"
+      subtitle="Asigna un ejemplar a un socio registrado"
+      size="lg"
+      (close)="closeModal()"
+    >
+      <div class="rules-banner">
+        <app-icon name="info" [size]="18" class="rules-icon" />
+        <div class="rules-text">
+          <strong>Reglas de la biblioteca:</strong>
+          <span
+            >Plazo de 14 días · Máximo 3 préstamos activos por socio · Sin préstamos vencidos
+            pendientes.</span
+          >
+        </div>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="lend()" id="loan-form" novalidate>
+        <div class="form-stack">
+          <div class="form-group">
+            <label for="member">Usuario lector *</label>
+            <app-combobox
+              inputId="member"
+              formControlName="memberId"
+              [options]="memberOptions()"
+              [invalid]="invalid('memberId')"
+              placeholder="Escribe el nombre o correo, o despliega la lista..."
+              emptyText="Ningún usuario coincide con la búsqueda"
+            />
+            @if (invalid('memberId')) {
+              <p class="error"><app-icon name="alert" [size]="13" /> Selecciona un usuario.</p>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="book">Libro a prestar *</label>
+            <select
+              id="book"
+              formControlName="bookId"
+              [class.invalid]="invalid('bookId')"
+              [attr.aria-invalid]="invalid('bookId')"
+            >
+              <option value="">Selecciona un libro...</option>
+              @for (b of availableBooks(); track b.id) {
+                <option [value]="b.id">
+                  {{ b.title }} — {{ b.author }} ({{ b.availableCopies }} disponibles)
+                </option>
+              }
+            </select>
+            @if (invalid('bookId')) {
+              <p class="error"><app-icon name="alert" [size]="13" /> Selecciona un libro.</p>
+            }
+          </div>
+        </div>
+      </form>
+
+      <div modal-actions>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="closeModal()"
+          [disabled]="saving()"
+        >
+          Cancelar
+        </button>
+        <button type="submit" form="loan-form" class="btn btn-primary" [disabled]="saving()">
+          @if (saving()) {
+            <span class="spinner-sm"></span>
+          }
+          Prestar libro
+        </button>
+      </div>
+    </app-modal>
+
+    <!-- Modal Confirmación Devolución -->
+    <app-confirm-dialog
+      [open]="returnDialogOpen()"
+      title="Registrar devolución"
+      [message]="
+        '¿Confirmas la devolución del libro «' +
+        (loanToReturn()?.bookTitle ?? '') +
+        '» por parte de ' +
+        (loanToReturn()?.memberName ?? '') +
+        '?'
+      "
+      confirmText="Confirmar devolución"
+      variant="primary"
+      [loading]="returning()"
+      (confirm)="confirmReturn()"
+      (cancel)="cancelReturn()"
+    />
+  `,
+  styles: `
+    /* ---- Tabla de préstamos adaptable (sin scroll horizontal) ---- */
+    .loans-table td {
+      white-space: normal;
+    }
+    .loans-table .col-actions {
+      width: 1%;
+      text-align: right;
+    }
+    .returned-inline {
+      display: none;
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* Pantallas medianas: la fecha de devolución pasa bajo el estado. */
+    @media (max-width: 1100px) {
+      .loans-table .col-returned {
+        display: none;
+      }
+      .returned-inline {
+        display: block;
+      }
+      .loans-table th,
+      .loans-table td {
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+      }
+    }
+
+    /* Móvil: cada préstamo se muestra como una tarjeta compacta. */
+    @media (max-width: 720px) {
+      .loans-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+      }
+      .loans-table,
+      .loans-table tbody {
+        display: block;
+      }
+      .loans-table tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        grid-template-areas:
+          'book book actions'
+          'user user status'
+          'loan due due';
+        gap: 0.6rem 0.75rem;
+        padding: 0.9rem 0.85rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .loans-table tbody tr:last-child {
+        border-bottom: 0;
+      }
+      .loans-table td {
+        display: block;
+        padding: 0;
+        border: 0;
+      }
+      .loans-table .col-book {
+        grid-area: book;
+        min-width: 0;
+      }
+      .loans-table .col-actions {
+        grid-area: actions;
+        width: auto;
+      }
+      .loans-table .col-user {
+        grid-area: user;
+        align-self: center;
+      }
+      .loans-table .col-status {
+        grid-area: status;
+        justify-self: end;
+        text-align: right;
+      }
+      .loans-table .col-loan {
+        grid-area: loan;
+      }
+      .loans-table .col-due {
+        grid-area: due;
+      }
+      /* Etiqueta visible para las fechas, ya que la cabecera está oculta. */
+      .loans-table .col-loan::before,
+      .loans-table .col-due::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin-bottom: 0.2rem;
+      }
+    }
+
+    .pill-danger {
+      color: var(--danger);
+    }
+    .loan-book-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .book-mini-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .loan-book-title {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .loan-user-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .loan-user-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .date-tag {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .date-tag.muted {
+      color: var(--muted);
+    }
+    .date-tag.due-alert {
+      color: var(--danger);
+      font-weight: 700;
+    }
+    .due-date-cell {
+      display: flex;
+      flex-direction: column;
+    }
+    .due-subtext {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .due-subtext.sub-danger {
+      color: var(--danger);
+      font-weight: 600;
+    }
+    .row-overdue {
+      background: rgba(239, 68, 68, 0.04);
+    }
+    .rules-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      background: var(--info-light);
+      border: 1px solid var(--info-border);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      margin-bottom: 1.25rem;
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    .rules-icon {
+      color: var(--info);
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+    }
+    .rules-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      line-height: 1.4;
+    }
   `,
 })
 export class LoansPage implements OnInit {
@@ -95,9 +580,81 @@ export class LoansPage implements OnInit {
   readonly loading = signal(true);
   readonly saving = signal(false);
 
+  // Modales
+  readonly isModalOpen = signal(false);
+  readonly returnDialogOpen = signal(false);
+  readonly loanToReturn = signal<Loan | null>(null);
+  readonly returning = signal(false);
+
+  // Filtros
+  readonly searchTerm = signal('');
+  readonly statusFilter = signal<LoanFilterStatus>('ALL');
+  readonly sortField = signal<LoanSortField>('dueDate');
+  readonly sortOrder = signal<SortOrder>('asc');
+
+  /** Opciones del menú para préstamos activos o vencidos (referencia estable para OnPush). */
+  readonly activeLoanActions: ActionMenuItem[] = [
+    { id: 'return', label: 'Registrar devolución', icon: 'return' },
+  ];
+
+  /** Usuarios como opciones del buscador (el valor es el id en texto, igual que el formulario). */
+  readonly memberOptions = computed<ComboboxOption<string>[]>(() =>
+    this.members().map((m) => ({ value: String(m.id), label: m.name, description: m.email })),
+  );
+
   readonly form = this.fb.group({
     memberId: this.fb.control<string | null>(null, Validators.required),
     bookId: this.fb.control<string | null>(null, Validators.required),
+  });
+
+  // Computed counters
+  readonly activeLoansCount = computed(
+    () => this.loans().filter((l) => l.status === 'ACTIVE').length,
+  );
+
+  readonly overdueLoansCount = computed(
+    () => this.loans().filter((l) => l.status === 'OVERDUE').length,
+  );
+
+  readonly returnedLoansCount = computed(
+    () => this.loans().filter((l) => l.status === 'RETURNED').length,
+  );
+
+  readonly filteredLoans = computed(() => {
+    let result = [...this.loans()];
+    const query = this.searchTerm().trim().toLowerCase();
+    const status = this.statusFilter();
+    const field = this.sortField();
+    const order = this.sortOrder();
+
+    if (status !== 'ALL') {
+      result = result.filter((l) => l.status === status);
+    }
+
+    if (query) {
+      result = result.filter(
+        (l) =>
+          l.bookTitle.toLowerCase().includes(query) || l.memberName.toLowerCase().includes(query),
+      );
+    }
+
+    result.sort((a, b) => {
+      let comp = 0;
+      if (field === 'bookTitle') {
+        comp = a.bookTitle.localeCompare(b.bookTitle);
+      } else if (field === 'memberName') {
+        comp = a.memberName.localeCompare(b.memberName);
+      } else if (field === 'loanDate') {
+        comp = a.loanDate.localeCompare(b.loanDate);
+      } else if (field === 'dueDate') {
+        comp = a.dueDate.localeCompare(b.dueDate);
+      } else if (field === 'status') {
+        comp = a.status.localeCompare(b.status);
+      }
+      return order === 'asc' ? comp : -comp;
+    });
+
+    return result;
   });
 
   ngOnInit(): void {
@@ -110,11 +667,49 @@ export class LoansPage implements OnInit {
   }
 
   statusLabel(s: LoanStatus): string {
-    return STATUS_LABEL[s];
+    switch (s) {
+      case 'ACTIVE':
+        return 'Activo';
+      case 'OVERDUE':
+        return 'Vencido';
+      case 'RETURNED':
+        return 'Devuelto';
+    }
   }
 
   statusClass(s: LoanStatus): string {
-    return STATUS_CLASS[s];
+    switch (s) {
+      case 'ACTIVE':
+        return 'badge ok';
+      case 'OVERDUE':
+        return 'badge bad';
+      case 'RETURNED':
+        return 'badge muted';
+    }
+  }
+
+  onSearchInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.searchTerm.set(target?.value ?? '');
+  }
+
+  toggleSort(field: LoanSortField): void {
+    if (this.sortField() === field) {
+      this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.sortField.set(field);
+      this.sortOrder.set('asc');
+    }
+  }
+
+  getSortIcon(field: LoanSortField): 'sort' | 'arrow-up' | 'arrow-down' {
+    if (this.sortField() !== field) return 'sort';
+    return this.sortOrder() === 'asc' ? 'arrow-up' : 'arrow-down';
+  }
+
+  resetFilters(): void {
+    this.searchTerm.set('');
+    this.statusFilter.set('ALL');
   }
 
   load(): void {
@@ -127,24 +722,35 @@ export class LoansPage implements OnInit {
       next: ({ loans, members, books }) => {
         this.loans.set(loans);
         this.members.set(members);
-        this.availableBooks.set(books.filter(b => b.available));
+        this.availableBooks.set(books.filter((b) => b.available));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
   }
 
+  openCreateModal(): void {
+    this.form.reset();
+    this.isModalOpen.set(true);
+  }
+
+  closeModal(): void {
+    this.isModalOpen.set(false);
+    this.form.reset();
+  }
+
   lend(): void {
     if (this.form.invalid) {
+      this.isModalOpen.set(true);
       this.form.markAllAsTouched();
       return;
     }
     const { memberId, bookId } = this.form.getRawValue();
     this.saving.set(true);
     this.api.lend(Number(bookId), Number(memberId)).subscribe({
-      next: loan => {
+      next: (loan) => {
         this.notify.ok(`Préstamo registrado, vence el ${loan.dueDate}`);
-        this.form.reset();
+        this.closeModal();
         this.saving.set(false);
         this.load();
       },
@@ -152,9 +758,83 @@ export class LoansPage implements OnInit {
     });
   }
 
-  giveBack(loan: Loan): void {
+  /** Despacha la opción elegida en el menú de acciones de un préstamo. */
+  onAction(action: string, loan: Loan): void {
+    if (action === 'return') {
+      this.promptReturn(loan);
+    }
+  }
+
+  promptReturn(loan: Loan): void {
+    this.loanToReturn.set(loan);
+    this.returnDialogOpen.set(true);
+  }
+
+  confirmReturn(): void {
+    const loan = this.loanToReturn();
+    if (!loan) return;
+
+    this.returning.set(true);
     this.api.giveBack(loan.id).subscribe({
-      next: () => { this.notify.ok('Devolución registrada'); this.load(); },
+      next: () => {
+        this.notify.ok('Devolución registrada');
+        this.returnDialogOpen.set(false);
+        this.loanToReturn.set(null);
+        this.returning.set(false);
+        this.load();
+      },
+      error: () => {
+        this.returning.set(false);
+      },
     });
+  }
+
+  cancelReturn(): void {
+    this.returnDialogOpen.set(false);
+    this.loanToReturn.set(null);
+  }
+
+  giveBack(loan: Loan): void {
+    this.promptReturn(loan);
+  }
+
+  formatDate(dateStr: string): string {
+    if (!dateStr) return '—';
+    try {
+      const [year, month, day] = dateStr.split('-');
+      if (year && month && day) {
+        return `${day}/${month}/${year}`;
+      }
+    } catch {
+      // fallback
+    }
+    return dateStr;
+  }
+
+  getDaysRelativeText(dueDateStr: string, status: LoanStatus): string {
+    if (status === 'RETURNED' || !dueDateStr) return '';
+    const now = new Date();
+    const [year, month, day] = dueDateStr.split('-').map(Number);
+    const due = new Date(year, month - 1, day);
+    const diffTime = due.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      const daysOverdue = Math.abs(diffDays);
+      return `Vencido hace ${daysOverdue} ${daysOverdue === 1 ? 'día' : 'días'}`;
+    } else if (diffDays === 0) {
+      return 'Vence hoy';
+    } else if (diffDays === 1) {
+      return 'Vence mañana';
+    } else {
+      return `Quedan ${diffDays} días`;
+    }
+  }
+
+  getInitials(name: string): string {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 }
