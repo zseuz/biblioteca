@@ -44,7 +44,7 @@ export type BookDuplicate =
               <strong>{{ dup.existing.title }}</strong>
               <span>{{ dup.existing.author }} · {{ dup.existing.genre }}</span>
               <span>
-                {{ copies(dup.existing.totalCopies) }} ({{ dup.existing.availableCopies }} disponibles)
+                {{ copies(dup.existing.totalCopies) }} ({{ available(dup.existing.availableCopies) }})
               </span>
             </div>
           </div>
@@ -52,7 +52,7 @@ export type BookDuplicate =
             ¿Quieres añadir los <strong>{{ copies(dup.draft.totalCopies) }}</strong> que ibas a
             ingresar? El libro quedará con
             <strong>{{ dup.existing.totalCopies + dup.draft.totalCopies }}</strong> en total y
-            <strong>{{ dup.existing.availableCopies + dup.draft.totalCopies }}</strong> disponibles.
+            <strong>{{ available(dup.existing.availableCopies + dup.draft.totalCopies) }}</strong>.
           </p>
         } @else {
           <div class="table-wrap dup-compare">
@@ -161,8 +161,8 @@ export type BookDuplicate =
       color: var(--muted);
       background: transparent;
     }
-    .dup-diff td,
-    .dup-diff th {
+    .dup-compare .dup-diff td,
+    .dup-compare .dup-diff th {
       background: var(--warning-light);
     }
     .dup-diff .badge {
@@ -188,6 +188,10 @@ export class BookDuplicateDialogComponent {
     const dup = this.duplicate();
     return dup?.kind === 'genre' ? dup.existing.map((b) => b.genre).join(', ') : '';
   });
+
+  protected available(n: number): string {
+    return `${n} ${n === 1 ? 'disponible' : 'disponibles'}`;
+  }
 
   protected copies(n: number): string {
     return `${n} ${n === 1 ? 'ejemplar' : 'ejemplares'}`;
