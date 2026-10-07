@@ -10,6 +10,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
+import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import {
   Book,
@@ -42,6 +43,7 @@ export type SortOrder = 'asc' | 'desc';
 @Component({
   selector: 'app-loans-page',
   imports: [
+    RouterLink,
     ReactiveFormsModule,
     IconComponent,
     ActionMenuComponent,
@@ -177,6 +179,14 @@ export type SortOrder = 'asc' | 'desc';
             <app-skeleton height="2.2rem" />
           </div>
         </div>
+      } @else if (loadError() && !result()) {
+        <app-empty-state
+          icon="alert"
+          title="No se pudieron cargar los préstamos"
+          message="No hay conexión con el servidor. Comprueba que el backend esté encendido e inténtalo de nuevo."
+          actionLabel="Reintentar"
+          (action)="load()"
+        />
       } @else if (pageItems().length === 0) {
         @if (totalLoansCount() === 0) {
           <app-empty-state
@@ -346,6 +356,21 @@ export type SortOrder = 'asc' | 'desc';
         </div>
       </div>
 
+      @if (missingFormData()) {
+        <div class="missing-data" role="status">
+          <app-icon name="info" [size]="16" />
+          <div>
+            <strong>Todavía no se puede registrar un préstamo.</strong>
+            @if (members().length === 0) {
+              <span>Aún no hay usuarios registrados. <a routerLink="/usuarios">Ir a Usuarios</a></span>
+            }
+            @if (availableBooks().length === 0) {
+              <span>No hay libros con ejemplares disponibles. <a routerLink="/libros">Ir a Libros</a></span>
+            }
+          </div>
+        </div>
+      }
+
       <form [formGroup]="form" (ngSubmit)="lend()" id="loan-form" novalidate>
         <div class="form-stack">
           <div class="form-group">
@@ -356,7 +381,7 @@ export type SortOrder = 'asc' | 'desc';
               [options]="memberOptions()"
               [invalid]="invalid('memberId')"
               placeholder="Escribe el nombre o correo, o despliega la lista..."
-              emptyText="Ningún usuario coincide con la búsqueda"
+              [emptyText]="members().length ? 'Ningún usuario coincide con la búsqueda' : 'Aún no hay usuarios registrados'"
             />
             @if (invalid('memberId')) {
               <p class="error"><app-icon name="alert" [size]="13" /> Selecciona un usuario.</p>
@@ -372,7 +397,7 @@ export type SortOrder = 'asc' | 'desc';
               [options]="bookOptions()"
               [invalid]="invalid('bookId')"
               placeholder="Escribe el título o el autor, o despliega la lista..."
-              emptyText="Ningún libro disponible coincide con la búsqueda"
+              [emptyText]="availableBooks().length ? 'Ningún libro disponible coincide con la búsqueda' : 'No hay libros con ejemplares disponibles'"
             />
             @if (invalid('bookId')) {
               <p class="error"><app-icon name="alert" [size]="13" /> Selecciona un libro.</p>
@@ -390,7 +415,7 @@ export type SortOrder = 'asc' | 'desc';
         >
           Cancelar
         </button>
-        <button type="submit" form="loan-form" class="btn btn-primary" [disabled]="saving()" [class.is-loading]="saving()" [attr.aria-busy]="saving()">
+        <button type="submit" form="loan-form" class="btn btn-primary" [disabled]="saving() || missingFormData()" [class.is-loading]="saving()" [attr.aria-busy]="saving()">
           <span class="btn-label">Prestar libro</span>
           @if (saving()) {
             <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
@@ -642,6 +667,32 @@ export type SortOrder = 'asc' | 'desc';
       outline-offset: 2px;
       border-radius: 2px;
     }
+    /* Aviso dentro de un formulario cuando faltan datos para poder usarlo */
+    .missing-data {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-subtle);
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+    .missing-data app-icon {
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+      color: var(--primary);
+    }
+    .missing-data div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .missing-data a {
+      color: var(--primary);
+      font-weight: 600;
+    }
     .due-subtext.sub-danger {
       color: var(--danger);
       font-weight: 600;
@@ -739,6 +790,14 @@ export class LoansPage implements OnInit {
   readonly history = signal<LoanRenewalHistory | null>(null);
   /** Aviso de préstamo repetido (el usuario ya tiene ese libro sin devolver). */
   readonly repeat = signal<LoanRepeat | null>(null);
+  /** La última consulta del historial falló (sin conexión con el servidor). */
+  readonly loadError = signal(false);
+  /** Ya se cargaron los usuarios y libros del formulario (para no avisar "no hay" mientras cargan). */
+  readonly formDataLoaded = signal(false);
+  /** Faltan usuarios o libros disponibles: el préstamo no se puede registrar todavía. */
+  readonly missingFormData = computed(
+    () => this.formDataLoaded() && (this.members().length === 0 || this.availableBooks().length === 0),
+  );
 
   /** Usuarios como opciones del buscador (el valor es el id en texto, igual que el formulario). */
   readonly memberOptions = computed<ComboboxOption<string>[]>(() =>
@@ -795,6 +854,8 @@ export class LoansPage implements OnInit {
       .subscribe((page) => {
         this.fetching.set(false);
         this.loading.set(false);
+        // Sin conexión: se avisa del error en lugar de decir que no hay préstamos.
+        this.loadError.set(!page);
         if (!page) return;
         // Si la página quedó vacía (p. ej. se devolvió el último préstamo de la última página),
         // se retrocede a la última página que sí existe.
@@ -908,6 +969,7 @@ export class LoansPage implements OnInit {
         this.summary.set(summary);
         this.members.set(members);
         this.availableBooks.set(books.filter((b) => b.available));
+        this.formDataLoaded.set(true);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
