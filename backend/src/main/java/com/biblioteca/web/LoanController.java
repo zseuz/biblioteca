@@ -54,10 +54,11 @@ public class LoanController {
             @RequestParam(defaultValue = "ALL") String status,
             @Parameter(description = "Texto en el título del libro o el nombre del usuario", example = "dune")
             @RequestParam(required = false) String q,
-            @Parameter(description = "bookTitle, memberName, loanDate, dueDate o status", example = "dueDate")
-            @RequestParam(defaultValue = "dueDate") String sort,
-            @Parameter(description = "asc o desc", example = "asc")
-            @RequestParam(defaultValue = "asc") String direction,
+            @Parameter(description = "bookTitle, memberName, loanDate, dueDate o status. "
+                    + "Por defecto loanDate (los préstamos más recientes primero)", example = "loanDate")
+            @RequestParam(required = false) String sort,
+            @Parameter(description = "asc o desc. Por defecto desc si no se indica sort; asc si se indica", example = "desc")
+            @RequestParam(required = false) String direction,
             @Parameter(description = "Página, empezando en 0") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Elementos por página (1-100)")
             @RequestParam(defaultValue = "" + LoanQuery.DEFAULT_SIZE) int size) {
