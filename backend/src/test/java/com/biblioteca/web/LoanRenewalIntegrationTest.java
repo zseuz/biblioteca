@@ -73,6 +73,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
         return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
     }
 
+    /** La consulta de préstamo repetido devuelve los préstamos sin devolver de ese usuario y libro. */
     @Test
     void activeLoansOfAMemberForABookAreListed() throws Exception {
         mvc.perform(get("/api/loans/active").param("memberId", ana.getId().toString()).param("bookId", dune.getId().toString()))
@@ -87,6 +88,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$", hasSize(0)));
     }
 
+    /** La respuesta trae renewableFrom (desde cuándo se puede renovar); en un devuelto es null. */
     @Test
     void theResponseTellsFromWhichDayALoanCanBeRenewed() throws Exception {
         // tooEarly vence en 9 días → se puede renovar desde dentro de 4.
@@ -98,6 +100,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.renewableFrom", nullValue()));
     }
 
+    /** Renovar dentro de la ventana: vence en 14 días desde hoy y queda la hora de la renovación. */
     @Test
     void renewingInTheLastFiveDaysGivesFourteenDaysFromToday() throws Exception {
         mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
@@ -110,6 +113,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.renewableFrom", is(today.plusDays(9).toString())));
     }
 
+    /** Renovar antes de tiempo: 409 con la fecha exacta, y no se registra nada. */
     @Test
     void renewingTooEarlyIsRejectedSayingFromWhen() throws Exception {
         mvc.perform(post("/api/loans/{id}/renew", tooEarly.getId()))
@@ -123,6 +127,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.loan.dueDate", is(today.plusDays(9).toString())));
     }
 
+    /** Vencidos y devueltos no se renuevan (409); un préstamo inexistente da 404. */
     @Test
     void overdueReturnedOrUnknownLoansCannotBeRenewed() throws Exception {
         mvc.perform(post("/api/loans/{id}/renew", overdue.getId()))
@@ -137,6 +142,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
         mvc.perform(post("/api/loans/{id}/renew", 999_999)).andExpect(status().isNotFound());
     }
 
+    /** Un préstamo hecho hoy por la API no se puede renovar hasta sus últimos 5 días. */
     @Test
     void aLoanMadeTodayCannotBeRenewedYet() throws Exception {
         Member luis = members.save(new Member("Luis", "luis@example.com"));
@@ -151,6 +157,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.message", containsString("No es posible renovar hasta el " + format(today.plusDays(9)))));
     }
 
+    /** El historial muestra el préstamo inicial y cada renovación con sus fechas y días ganados. */
     @Test
     void renewalHistoryShowsTheInitialLoanAndEachRenewal() throws Exception {
         mvc.perform(post("/api/loans/{id}/renew", inTime.getId())).andExpect(status().isOk());
@@ -171,6 +178,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/loans/{id}/renewals", 999_999)).andExpect(status().isNotFound());
     }
 
+    /** La segunda renovación del día se rechaza indicando la hora de la primera. */
     @Test
     void renewingTwiceTheSameDayIsRejectedWithTheTimeOfTheFirstRenewal() throws Exception {
         String json = mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
@@ -185,6 +193,7 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.renewals", hasSize(1)));
     }
 
+    /** Préstamos renovados con una versión antigua (sin historial) se cuentan como renovaciones sin detalle. */
     @Test
     void renewalsMadeBeforeTheHistoryExistedAreCountedWithoutDetail() throws Exception {
         // Simula un préstamo renovado con una versión anterior (sin filas en loan_renewal).

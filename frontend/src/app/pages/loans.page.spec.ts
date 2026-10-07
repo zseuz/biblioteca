@@ -7,9 +7,18 @@ import { NotifyService } from '../core/notify.service';
 import { Loan, PageResponse } from '../core/models';
 import { LoansPage } from './loans.page';
 
+/**
+ * Pruebas de la pantalla Préstamos: paginación y filtros en el servidor, registrar,
+ * préstamo repetido, renovación (ventana de 5 días), historial y comportamiento sin datos.
+ *
+ * Las pruebas no llaman al backend real: HttpTestingController captura cada petición
+ * (expectOne) y la prueba decide qué responder (flush para éxito, error para fallos de red).
+ * afterEach(http.verify) falla si quedó alguna petición sin responder.
+ */
 describe('LoansPage', () => {
   let http: HttpTestingController;
 
+  /** Préstamo de ejemplo que devuelve la API simulada. */
   const quijote: Loan = {
     id: 1,
     bookId: 1,
@@ -22,6 +31,7 @@ describe('LoansPage', () => {
     status: 'ACTIVE',
   };
 
+  /** Construye una respuesta paginada como la del servidor. */
   const page = (content: Loan[], extra: Partial<PageResponse<Loan>> = {}): PageResponse<Loan> => ({
     content,
     page: 0,
@@ -50,6 +60,7 @@ describe('LoansPage', () => {
       ]);
   }
 
+  /** Monta la pantalla, responde la carga inicial y devuelve el fixture listo para interactuar. */
   async function create(firstPage = page([quijote])): Promise<ComponentFixture<LoansPage>> {
     const fixture = TestBed.createComponent(LoansPage);
     fixture.detectChanges();
@@ -197,6 +208,7 @@ describe('LoansPage', () => {
     expect(fixture.componentInstance.form.invalid).toBe(true);
   });
 
+  /** Reconoce la consulta «¿el usuario ya tiene este libro?». */
   const isActiveCheck = (r: { url: string }) => r.url === `${API_URL}/loans/active`;
 
   it('registra el préstamo (tras comprobar que no lo tiene ya) y recarga la página', async () => {

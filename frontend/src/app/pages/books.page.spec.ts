@@ -6,9 +6,18 @@ import { API_URL } from '../core/api.service';
 import { Book } from '../core/models';
 import { BooksPage } from './books.page';
 
+/**
+ * Pruebas de la pantalla Libros: lista, validaciones del formulario, aviso de duplicados,
+ * préstamo rápido, género, búsqueda sin resultados y comportamiento sin conexión.
+ *
+ * Las pruebas no llaman al backend real: HttpTestingController captura cada petición
+ * (expectOne) y la prueba decide qué responder (flush para éxito, error para fallos de red).
+ * afterEach(http.verify) falla si quedó alguna petición sin responder.
+ */
 describe('BooksPage', () => {
   let http: HttpTestingController;
 
+  /** Libro de ejemplo que devuelve la API simulada. */
   const dune: Book = {
     id: 1,
     title: 'Dune',
@@ -19,9 +28,11 @@ describe('BooksPage', () => {
     available: true,
   };
 
+  /** Reconocen las peticiones de la lista de libros y de la comprobación de duplicados. */
   const isList = (r: { method: string; url: string }) => r.method === 'GET' && r.url === `${API_URL}/books`;
   const isDuplicateCheck = (r: { url: string }) => r.url === `${API_URL}/books/duplicates`;
 
+  /** Monta la pantalla y responde la carga inicial del catálogo con el libro de ejemplo. */
   function create() {
     const fixture = TestBed.createComponent(BooksPage);
     fixture.detectChanges();

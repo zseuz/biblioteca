@@ -37,6 +37,7 @@ class LoanTest {
         return loan.renew(when, DAYS, WINDOW);
     }
 
+    /** Renovar da otra vez 14 días contando desde hoy, suma una renovación y no cambia la fecha del préstamo. */
     @Test
     void renewGivesTheFullPeriodAgainFromToday() {
         Loan loan = loanStartedDaysAgo(10); // vence en 4 días: dentro de la ventana
@@ -49,6 +50,7 @@ class LoanTest {
         assertThat(loan.getLoanDate()).as("la fecha del préstamo no cambia").isEqualTo(TODAY.minusDays(10));
     }
 
+    /** Límite de la ventana: con exactamente 5 días restantes ya se puede renovar. */
     @Test
     void canBeRenewedExactlyWhenFiveDaysRemain() {
         Loan loan = loanStartedDaysAgo(9); // vence en 5 días: primer día permitido
@@ -59,6 +61,7 @@ class LoanTest {
         assertThat(loan.getRenewals()).isEqualTo(1);
     }
 
+    /** Con 6 días restantes no se puede, y el mensaje dice desde qué fecha se podrá; el préstamo no cambia. */
     @Test
     void cannotBeRenewedBeforeTheLastFiveDaysAndTheMessageSaysFromWhen() {
         Loan loan = loanStartedDaysAgo(8); // vence en 6 días: un día antes de poder renovar
@@ -73,6 +76,7 @@ class LoanTest {
         assertThat(loan.getDueDate()).isEqualTo(TODAY.plusDays(6));
     }
 
+    /** Un préstamo recién hecho no se puede renovar hasta sus últimos 5 días. */
     @Test
     void aLoanMadeTodayCannotBeRenewedUntilItsLastDays() {
         Loan loan = loanStartedDaysAgo(0); // vence el 21/10 → se podrá renovar desde el 16/10
@@ -81,6 +85,7 @@ class LoanTest {
         assertThat(loan.getRenewals()).isZero();
     }
 
+    /** No hay límite de renovaciones si cada una se hace dentro de la ventana; se cuentan todas. */
     @Test
     void renewalsAreCountedWithoutLimitWhenEachOneIsInTheWindow() {
         Loan loan = loanStartedDaysAgo(10); // vence el 11/10
@@ -91,6 +96,7 @@ class LoanTest {
         assertThat(loan.getDueDate()).isEqualTo(TODAY.plusDays(23));
     }
 
+    /** Un préstamo vencido no se renueva: debe devolverse. */
     @Test
     void overdueLoanCannotBeRenewed() {
         Loan loan = loanStartedDaysAgo(20); // venció hace 6 días
@@ -101,6 +107,7 @@ class LoanTest {
         assertThat(loan.getRenewals()).isZero();
     }
 
+    /** El día del vencimiento todavía está en plazo y se puede renovar. */
     @Test
     void dueTodayIsStillInTimeAndCanBeRenewed() {
         Loan loan = loanStartedDaysAgo(14); // vence hoy: aún no está vencido
@@ -110,6 +117,7 @@ class LoanTest {
         assertThat(loan.getDueDate()).isEqualTo(TODAY.plusDays(14));
     }
 
+    /** Un préstamo devuelto no se puede renovar. */
     @Test
     void returnedLoanCannotBeRenewed() {
         Loan loan = loanStartedDaysAgo(3);
@@ -118,6 +126,7 @@ class LoanTest {
         assertThatThrownBy(() -> renew(loan, NOW)).hasMessageContaining("devuelto");
     }
 
+    /** Cada renovación queda en el historial con su fecha y hora y los vencimientos anterior y nuevo. */
     @Test
     void eachRenewalIsRecordedWithItsDateTimeAndDueDates() {
         Loan loan = loanStartedDaysAgo(10); // vence el 11/10
@@ -131,6 +140,7 @@ class LoanTest {
         assertThat(loan.getLastRenewedAt()).isEqualTo(NOW);
     }
 
+    /** Intentar renovar otra vez el mismo día: el mensaje dice a qué hora se renovó y desde cuándo se podrá. */
     @Test
     void renewingAgainTheSameDayIsRejectedMentioningTheTimeAndTheNextDate() {
         Loan loan = loanStartedDaysAgo(10);
@@ -144,6 +154,7 @@ class LoanTest {
         assertThat(loan.getRenewalHistory()).hasSize(1);
     }
 
+    /** Con la ventana configurada en 0 días solo se puede renovar el mismo día del vencimiento. */
     @Test
     void windowOfZeroAllowsRenewingOnlyOnTheDueDate() {
         Loan loan = loanStartedDaysAgo(13); // vence mañana
