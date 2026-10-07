@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActionMenuComponent, ActionMenuItem } from './action-menu.component';
 
+/** Componente «anfitrión» de prueba: usa el menú igual que una pantalla real. */
 @Component({
   imports: [ActionMenuComponent],
   template: `
@@ -17,9 +18,11 @@ class HostComponent {
   readonly chosen = signal<string | null>(null);
 }
 
+/** Menú ⋮: abrir, elegir una opción, cerrar con Escape (devolviendo el foco) y al hacer clic fuera. */
 describe('ActionMenuComponent', () => {
   const panel = () => document.querySelector<HTMLElement>('.menu-panel');
 
+  /** Monta el anfitrión y devuelve lo necesario para interactuar con el menú. */
   async function setup() {
     const fixture = TestBed.createComponent(HostComponent);
     await fixture.whenStable();

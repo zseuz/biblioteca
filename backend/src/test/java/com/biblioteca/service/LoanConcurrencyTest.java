@@ -48,6 +48,11 @@ class LoanConcurrencyTest extends IntegrationTest {
     private LoanRepository loans;
 
 
+    /**
+     * 10 hilos piden el único ejemplar a la vez: exactamente uno lo consigue, solo se guarda un
+     * préstamo y el stock queda en 0, nunca negativo (gracias a @Version). Se repite 5 veces porque el
+     * orden de los hilos cambia en cada ejecución.
+     */
     @RepeatedTest(5)
     void onlyOneOfManySimultaneousLoansGetsTheLastCopy() throws Exception {
         Book book = books.save(new Book("Dune", "Frank Herbert", "Ciencia ficción", 1));

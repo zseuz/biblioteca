@@ -27,6 +27,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
     @Autowired
     private MockMvc mvc;
 
+    /** Recorrido completo por HTTP: crear libro y usuario, prestar, rechazar sin stock, devolver y ver las estadísticas. */
     @Test
     void fullLoanLifecycleLendReturnAndStats() throws Exception {
         long bookId = createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -68,6 +69,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.loansByGenre[0].label", is("Ciencia ficción")));
     }
 
+    /** Un cuerpo con datos inválidos responde 400 con el error de cada campo en «fields». */
     @Test
     void invalidPayloadReturns400WithFieldErrors() throws Exception {
         mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON)
@@ -77,6 +79,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.fields.totalCopies").exists());
     }
 
+    /** Nombre de 101 caracteres: 400 con el mensaje del campo; 100 exactos sí se aceptan. */
     @Test
     void memberNameLongerThan100CharsIsRejected() throws Exception {
         String longName = "A".repeat(101);
@@ -90,6 +93,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         createMember("B".repeat(100), "justo@example.com");
     }
 
+    /** Nombres con números o de 1–2 caracteres se aceptan: la web solo pide confirmación. */
     @Test
     void memberNameWithDigitsOrSingleCharIsAccepted() throws Exception {
         // No se bloquean: la interfaz pide confirmación, pero pueden ser nombres legítimos.
@@ -98,6 +102,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         createMember("Al", "al@example.com");
     }
 
+    /** Límites de cada campo del libro (mínimo, máximo, ejemplares 1–1000), sin contar espacios, y los valores justo en el límite. */
     @Test
     void bookFieldsHaveMinimumAndMaximumLengthsWithClearMessages() throws Exception {
         String base = "{\"title\":\"%s\",\"author\":\"%s\",\"genre\":\"%s\",\"totalCopies\":%d}";
@@ -127,6 +132,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         createBook("t".repeat(200), "a".repeat(150), "g".repeat(80), 1);
     }
 
+    /** El correo debe tener al menos 6 caracteres. */
     @Test
     void memberEmailMustHaveBetweenSixAndOneHundredFiftyCharacters() throws Exception {
         mvc.perform(post("/api/members").contentType(MediaType.APPLICATION_JSON)
@@ -140,6 +146,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         return mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content(json));
     }
 
+    /** No se puede registrar dos veces el mismo libro (título, autor y género, sin distinguir mayúsculas). */
     @Test
     void sameTitleAuthorAndGenreCannotBeRegisteredTwice() throws Exception {
         long id = createBook("Dune", "Frank Herbert", "Ciencia ficción", 2);
@@ -154,6 +161,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/books/{id}", id)).andExpect(jsonPath("$.totalCopies", is(2)));
     }
 
+    /** La consulta de duplicados distingue el libro idéntico del mismo libro con otro género. */
     @Test
     void duplicateCheckSeparatesSameBookFromDifferentGenre() throws Exception {
         long novela = createBook("Rayuela", "Julio Cortázar", "Novela", 1);
@@ -173,12 +181,14 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.differentGenre", hasSize(2)));
     }
 
+    /** El mismo título y autor con otro género sí se puede crear. */
     @Test
     void sameTitleAndAuthorWithDifferentGenreIsAllowed() throws Exception {
         createBook("Rayuela", "Julio Cortázar", "Novela", 1);
         createBook("Rayuela", "Julio Cortázar", "Ficción", 1); // createBook exige 201
     }
 
+    /** Sumar ejemplares por la API; cantidades fuera de rango o libro inexistente se rechazan. */
     @Test
     void addingCopiesIncreasesTotalAndAvailable() throws Exception {
         long id = createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -197,6 +207,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /** Editar un libro para que quede igual a otro existente se rechaza (409). */
     @Test
     void editingABookIntoAnExistingOneIsRejected() throws Exception {
         createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -211,6 +222,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /** La documentación OpenAPI (la que muestra Swagger) está publicada con el título y los endpoints esperados. */
     @Test
     void openApiDocumentationIsPublished() throws Exception {
         mvc.perform(get("/v3/api-docs"))
@@ -220,12 +232,14 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.components.schemas.ApiError").exists());
     }
 
+    /** Un JSON mal escrito responde 400, no un error 500. */
     @Test
     void malformedJsonReturns400() throws Exception {
         mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content("{no es json"))
                 .andExpect(status().isBadRequest());
     }
 
+    /** Registrar un correo que ya existe (aunque cambien las mayúsculas) responde 409. */
     @Test
     void duplicateEmailReturns409() throws Exception {
         createMember("Ana", "ana@example.com");
@@ -235,12 +249,14 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    /** Un libro o un préstamo que no existen responden 404. */
     @Test
     void unknownResourceReturns404() throws Exception {
         mvc.perform(get("/api/books/{id}", 999_999)).andExpect(status().isNotFound());
         mvc.perform(post("/api/loans/{id}/return", 999_999)).andExpect(status().isNotFound());
     }
 
+    /** Un libro que ya se prestó no se puede borrar (409): se conserva su historial. */
     @Test
     void cannotDeleteBookWithLoanHistory() throws Exception {
         long bookId = createBook("Dune", "Frank Herbert", "Ciencia ficción", 2);
@@ -250,6 +266,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(delete("/api/books/{id}", bookId)).andExpect(status().isConflict());
     }
 
+    /** El listado de usuarios trae préstamos activos y totales: así la web sabe a quién no puede borrar. */
     @Test
     void membersListIncludesLoanCountersSoTheUiKnowsWhoCanBeDeleted() throws Exception {
         long bookId = createBook("Dune", "Frank Herbert", "Ciencia ficción", 3);
@@ -271,6 +288,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(delete("/api/members/{id}", ana)).andExpect(status().isConflict());
     }
 
+    /** La búsqueda de libros encuentra por título, autor o género sin distinguir mayúsculas. */
     @Test
     void searchMatchesTitleAuthorOrGenreIgnoringCase() throws Exception {
         createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -282,6 +300,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/books").param("q", "")).andExpect(jsonPath("$", hasSize(2)));
     }
 
+    /** La búsqueda de libros ignora tildes («garcia» encuentra «García»; ñ ≈ n) y trata «%» como texto. */
     @Test
     void searchIgnoresAccents() throws Exception {
         createBook("Cien años de soledad", "Gabriel García Márquez", "Realismo mágico", 1);
@@ -295,6 +314,7 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/books").param("q", "50%")).andExpect(jsonPath("$", hasSize(0)));
     }
 
+    /** Si falta un parámetro obligatorio la API responde 400 con su nombre, no un error 500. */
     @Test
     void missingRequiredParametersAreClientErrorsNotServerErrors() throws Exception {
         mvc.perform(get("/api/loans/active").param("memberId", "1"))
