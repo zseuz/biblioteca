@@ -29,6 +29,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       préstamo <i>vencido</i>, asociados a un usuario de prueba propio
  *       ({@value #TEST_MEMBER_EMAIL}). Se crean también en bases que ya tienen datos y no se
  *       duplican: si el usuario de prueba existe, no se hace nada.</li>
+ *   <li><b>Préstamo renovado</b> (idempotente, con su propio usuario
+ *       {@value #RENEWALS_MEMBER_EMAIL}): un préstamo activo con tres renovaciones en días
+ *       distintos, para ver el historial de renovaciones.</li>
  * </ol>
  *
  * <p>Los préstamos se crean directamente (sin pasar por {@code LoanService}) porque el servicio
@@ -43,6 +46,7 @@ class DataSeeder {
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
     private static final int LOAN_DAYS = 14;
     static final String TEST_MEMBER_EMAIL = "prueba@biblioteca.test";
+    static final String RENEWALS_MEMBER_EMAIL = "renovaciones@biblioteca.test";
 
     @Bean
     CommandLineRunner seed(BookRepository books, MemberRepository members, LoanRepository loans,
@@ -54,6 +58,7 @@ class DataSeeder {
                 seedDemo(books, members, loans, today);
             }
             ensureTestRecords(books, members, loans, today);
+            ensureRenewedLoan(books, members, loans, today);
         });
     }
 
@@ -117,6 +122,28 @@ class DataSeeder {
                 activeLoan(overdueBook, tester, today.minusDays(LOAN_DAYS + 6))));
         log.info("Registros de prueba creados: libro agotado «1984» y préstamo vencido de «Rayuela» ({})",
                 TEST_MEMBER_EMAIL);
+    }
+
+    /**
+     * "Fahrenheit 451": prestado hace 20 días y renovado tres veces (hace 15, 8 y 2 días, a
+     * distintas horas). Cada renovación se hizo estando en plazo, así que hoy sigue activo y
+     * vence dentro de 12 días. Usa {@link Loan#renew}, por lo que el historial queda igual que
+     * si se hubiera renovado desde la aplicación.
+     */
+    private void ensureRenewedLoan(BookRepository books, MemberRepository members, LoanRepository loans,
+                                   LocalDate today) {
+        if (members.existsByEmail(RENEWALS_MEMBER_EMAIL)) {
+            return;
+        }
+        Member reader = members.save(new Member("Lector Renovaciones", RENEWALS_MEMBER_EMAIL));
+        Book book = books.save(new Book("Fahrenheit 451", "Ray Bradbury", "Ciencia ficción", 2));
+
+        Loan loan = activeLoan(book, reader, today.minusDays(20));      // plazo original: hasta hace 6 días
+        loan.renew(today.minusDays(15).atTime(9, 15), LOAN_DAYS);        // → vence ayer
+        loan.renew(today.minusDays(8).atTime(16, 40), LOAN_DAYS);        // → vence en 6 días
+        loan.renew(today.minusDays(2).atTime(11, 5), LOAN_DAYS);         // → vence en 12 días
+        loans.save(loan); // guarda también las renovaciones (cascade)
+        log.info("Registro de prueba creado: «Fahrenheit 451» con 3 renovaciones ({})", RENEWALS_MEMBER_EMAIL);
     }
 
     private static Loan activeLoan(Book book, Member member, LocalDate start) {
