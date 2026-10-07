@@ -11,6 +11,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
+import { normalizeText } from '../core/text';
 import { Member } from '../core/models';
 import { NAME_MAX, nameWarnings, notBlank } from '../core/member-name';
 import { NotifyService } from '../core/notify.service';
@@ -42,7 +43,7 @@ export type SortOrder = 'asc' | 'desc';
       <div>
         <h1 class="page-title">Usuarios y Lectores</h1>
         <p class="page-desc">
-          Administra el padrón de socios, sus correos de contacto y registro de préstamos.
+          Administra los usuarios de la biblioteca, sus correos de contacto y su registro de préstamos.
         </p>
       </div>
       <button type="button" class="btn btn-primary" (click)="openCreate()">
@@ -130,7 +131,7 @@ export type SortOrder = 'asc' | 'desc';
           <app-empty-state
             icon="users"
             title="No hay usuarios registrados"
-            message="Aún no hay socios en la base de datos. Comienza agregando al primer usuario."
+            message="Aún no hay usuarios registrados. Comienza agregando al primero."
             actionLabel="Agregar usuario"
             (action)="openCreate()"
           />
@@ -138,7 +139,7 @@ export type SortOrder = 'asc' | 'desc';
           <app-empty-state
             icon="search"
             title="Sin resultados"
-            message="No se encontraron socios que coincidan con la búsqueda."
+            message="No se encontraron usuarios que coincidan con la búsqueda."
             actionLabel="Limpiar búsqueda"
             (action)="searchTerm.set('')"
           />
@@ -231,8 +232,8 @@ export type SortOrder = 'asc' | 'desc';
       [title]="editing() ? 'Editar usuario' : 'Nuevo usuario'"
       [subtitle]="
         editing()
-          ? 'Actualiza los datos del socio'
-          : 'Ingresa la información básica para dar de alta al socio en el sistema'
+          ? 'Actualiza los datos del usuario'
+          : 'Ingresa la información básica para dar de alta al usuario en el sistema'
       "
       size="sm"
       (close)="cancel()"
@@ -590,13 +591,13 @@ export class MembersPage implements OnInit {
 
   readonly filteredMembers = computed(() => {
     let result = [...this.members()];
-    const query = this.searchTerm().trim().toLowerCase();
+    const query = normalizeText(this.searchTerm());
     const field = this.sortField();
     const order = this.sortOrder();
 
     if (query) {
       result = result.filter(
-        (m) => m.name.toLowerCase().includes(query) || m.email.toLowerCase().includes(query),
+        (m) => normalizeText(m.name).includes(query) || normalizeText(m.email).includes(query),
       );
     }
 

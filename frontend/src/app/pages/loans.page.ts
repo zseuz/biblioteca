@@ -24,7 +24,7 @@ import {
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
 import { PaginatorComponent } from '../shared/paginator.component';
-import { renewalBlockedReason } from '../core/renewal';
+import { formatIsoDate, renewalBlockedReason } from '../core/renewal';
 import { LoanRepeat, LoanRepeatDialogComponent } from './loan-repeat-dialog.component';
 import { LoanRenewalsDialogComponent } from './loan-renewals-dialog.component';
 import { messageFor } from '../core/error.interceptor';
@@ -331,7 +331,7 @@ export type SortOrder = 'asc' | 'desc';
     <app-modal
       [open]="isModalOpen() && !repeat()"
       title="Registrar nuevo préstamo"
-      subtitle="Asigna un ejemplar a un socio registrado"
+      subtitle="Asigna un ejemplar a un usuario registrado"
       size="lg"
       (close)="closeModal()"
     >
@@ -340,7 +340,7 @@ export type SortOrder = 'asc' | 'desc';
         <div class="rules-text">
           <strong>Reglas de la biblioteca:</strong>
           <span
-            >Plazo de 14 días · Máximo 3 préstamos activos por socio · Sin préstamos vencidos
+            >Plazo de 14 días · Máximo 3 préstamos activos por usuario · Sin préstamos vencidos
             pendientes.</span
           >
         </div>
@@ -1019,7 +1019,7 @@ export class LoansPage implements OnInit {
     this.saving.set(true);
     this.api.lend(bookId, memberId).subscribe({
       next: (loan) => {
-        this.notify.ok(`Préstamo registrado, vence el ${loan.dueDate}`);
+        this.notify.ok(`Préstamo registrado, vence el ${formatIsoDate(loan.dueDate)}`);
         this.closeModal();
         this.saving.set(false);
         this.load();
