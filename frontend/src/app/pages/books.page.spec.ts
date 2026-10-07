@@ -240,4 +240,28 @@ describe('BooksPage', () => {
     });
   });
 
+
+  describe('búsqueda sin resultados', () => {
+    it('dice «Sin resultados», no que el catálogo está vacío', async () => {
+      const fixture = create();
+      fixture.componentInstance.onSearch('zzzz');
+      await new Promise((r) => setTimeout(r, 300)); // espera del buscador (250 ms)
+      http.expectOne((r) => isList(r) || (r.method === 'GET' && r.url === `${API_URL}/books`)).flush([]);
+      await fixture.whenStable();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('Sin resultados');
+      expect(text).not.toContain('El catálogo está actualmente vacío');
+    });
+
+    it('con el catálogo realmente vacío sí invita a agregar el primer libro', async () => {
+      const fixture = TestBed.createComponent(BooksPage);
+      fixture.detectChanges();
+      http.expectOne(isList).flush([]);
+      await fixture.whenStable();
+
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('El catálogo está actualmente vacío');
+    });
+  });
+
 });

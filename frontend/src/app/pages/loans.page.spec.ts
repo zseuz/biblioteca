@@ -211,6 +211,7 @@ describe('LoansPage', () => {
     const req = http.expectOne((r) => r.method === 'POST' && r.url === `${API_URL}/loans`);
     expect(req.request.body).toEqual({ bookId: 1, memberId: 1 });
     req.flush({ ...quijote, id: 2 });
+    expect(TestBed.inject(NotifyService).notice()?.text).toContain('vence el 15/10/2026'); // no 2026-10-15
 
     flushAuxiliary();
     (await nextSearch(fixture)).flush(page([quijote, { ...quijote, id: 2 }]));
@@ -244,7 +245,7 @@ describe('LoansPage', () => {
 
     it('oculta la ventana de préstamo mientras se muestra el aviso y la recupera al cancelar', async () => {
       const fixture = await requestSameBook([quijote]);
-      const formText = 'Asigna un ejemplar a un socio registrado'; // subtítulo de la ventana de préstamo
+      const formText = 'Asigna un ejemplar a un usuario registrado'; // subtítulo de la ventana de préstamo
 
       expect(document.body.textContent).toContain('Este usuario ya tiene el libro');
       expect(document.body.textContent).not.toContain(formText);

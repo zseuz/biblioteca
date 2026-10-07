@@ -114,6 +114,7 @@ export interface StatEntry {
 export interface Stats {
   totalBooks: number;
   totalMembers: number;
+  /** Préstamos en plazo (los vencidos se cuentan aparte). */
   activeLoans: number;
   overdueLoans: number;
   returnedLoans: number;
