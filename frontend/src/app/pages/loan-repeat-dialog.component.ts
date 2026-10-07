@@ -6,6 +6,7 @@ import { ModalComponent } from '../shared/modal.component';
 
 /** Préstamo repetido detectado: el usuario ya tiene sin devolver el libro que vuelve a pedir. */
 export interface LoanRepeat {
+  /** Nombre del usuario y título del libro, para el mensaje del aviso. */
   memberName: string;
   bookTitle: string;
   /** Préstamos sin devolver de ese usuario para ese libro (normalmente uno). */
@@ -195,14 +196,17 @@ export interface LoanRepeat {
 export class LoanRepeatDialogComponent {
   /** Préstamo repetido detectado; {@code null} oculta el aviso. */
   readonly repeat = input<LoanRepeat | null>(null);
+  /** Hay una operación en curso (desactiva los botones). */
   readonly busy = input<boolean>(false);
 
   /** Confirmar: registrar otro préstamo del mismo libro. */
   readonly lendAnyway = output<void>();
   /** Renovar el préstamo existente (el que vence antes). */
   readonly renew = output<Loan>();
+  /** Cerrar el aviso sin hacer nada. */
   readonly cancel = output<void>();
 
+  /** ¿Alguno de los préstamos existentes está vencido? Entonces solo se informa (debe devolverlo). */
   protected readonly hasOverdue = computed(
     () => this.repeat()?.existing.some((l) => l.status === 'OVERDUE') ?? false,
   );
@@ -224,6 +228,7 @@ export class LoanRepeatDialogComponent {
     return target?.renewableFrom ? daysBetween(target.renewableFrom, target.dueDate) : 0;
   });
 
+  /** Fecha en formato 07/10/2026. */
   protected date(iso: string): string {
     return formatIsoDate(iso);
   }

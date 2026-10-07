@@ -24,9 +24,16 @@ import java.util.List;
  */
 class LoanSearchRepositoryImpl implements LoanSearchRepository {
 
+    /** Acceso directo a JPA para construir la consulta según los filtros recibidos. */
     @PersistenceContext
     private EntityManager em;
 
+    /**
+     * Devuelve una página del historial aplicando filtro, búsqueda y orden.
+     *
+     * @param query criterios ya validados ({@link LoanQuery})
+     * @param today fecha de referencia para decidir qué préstamos están vencidos
+     */
     @Override
     public PageResponse<Loan> search(LoanQuery query, LocalDate today) {
         String where = whereClause(query);
@@ -48,6 +55,10 @@ class LoanSearchRepositoryImpl implements LoanSearchRepository {
         return PageResponse.of(content, query.page(), query.size(), count.getSingleResult());
     }
 
+    /**
+     * Arma el {@code where} con solo las condiciones que hacen falta (estado y búsqueda).
+     * El texto del usuario no se concatena: va como parámetro {@code :text}.
+     */
     private static String whereClause(LoanQuery query) {
         StringBuilder where = new StringBuilder(" where 1 = 1");
         switch (query.status()) {

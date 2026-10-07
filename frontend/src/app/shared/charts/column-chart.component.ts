@@ -11,11 +11,14 @@ import {
 } from '@angular/core';
 import { ChartDatum, ChartUnit, niceTicks, withUnit } from './chart.models';
 
+/** Espacio alrededor del área de dibujo para los números del eje y las etiquetas de abajo. */
 const MARGIN = { top: 22, right: 8, bottom: 30, left: 34 };
 const MAX_BAR = 24; // grosor máximo de columna: el resto de la banda es aire
 const RADIUS = 4; // extremo de dato redondeado; la base queda recta
+/** Ancho supuesto antes de poder medir el contenedor real. */
 const FALLBACK_WIDTH = 600;
 
+/** Una columna ya calculada: posición, tamaño, trazado SVG y si se rotula su valor. */
 interface Column {
   datum: ChartDatum;
   index: number;
@@ -44,6 +47,7 @@ interface Column {
  */
 @Component({
   selector: 'app-column-chart',
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (width() > 0) {
@@ -199,19 +203,30 @@ interface Column {
   `,
 })
 export class ColumnChartComponent {
+  /** Una columna por dato (por ejemplo, un mes). */
   readonly data = input.required<ChartDatum[]>();
+  /** Unidad de los valores para tooltips y lectores de pantalla. */
   readonly unit = input<ChartUnit>({ one: 'elemento', many: 'elementos' });
   /** Texto corto bajo cada columna (p. ej. "oct"). */
   readonly tickLabel = input<(label: string) => string>((l) => l);
   /** Texto completo para tooltip y lectores de pantalla (p. ej. "octubre de 2026"). */
   readonly fullLabel = input<(label: string) => string>((l) => l);
+  /** Alto de la gráfica en píxeles. */
   readonly height = input<number>(240);
+  /** Resumen de la gráfica para lectores de pantalla. */
   readonly ariaLabel = input<string>('Gráfica de columnas');
 
+  /** Márgenes, expuestos a la plantilla. */
   protected readonly margin = MARGIN;
+  /** Ancho real del contenedor; se mide al pintar y al cambiar el tamaño de la ventana. */
   protected readonly width = signal(0);
+  /** Columna bajo el ratón o con el foco (muestra su tooltip). */
   protected readonly active = signal<number | null>(null);
 
+  /**
+   * Calcula escala, marcas del eje y la geometría de cada columna a partir de los datos y el
+   * ancho. Al ser computed, se recalcula solo cuando cambian los datos o el tamaño.
+   */
   protected readonly layout = computed(() => {
     const data = this.data();
     const plotW = Math.max(0, this.width() - MARGIN.left - MARGIN.right);
@@ -242,6 +257,7 @@ export class ColumnChartComponent {
     return { columns, ticks, band, plotH };
   });
 
+  /** Texto y posición del tooltip de la columna activa. */
   protected readonly tooltip = computed(() => {
     const i = this.active();
     if (i === null) return null;
@@ -267,6 +283,7 @@ export class ColumnChartComponent {
     inject(DestroyRef).onDestroy(() => observer.disconnect());
   }
 
+  /** Valor con su unidad, p. ej. «3 préstamos». */
   protected format(count: number): string {
     return withUnit(count, this.unit());
   }

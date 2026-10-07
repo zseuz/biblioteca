@@ -6,11 +6,16 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
  * garantía definitiva.
  */
 export const LIMITS = {
+  /** Título del libro: 2 a 200 caracteres. */
   title: { min: 2, max: 200 },
+  /** Autor: 3 a 150 caracteres. */
   author: { min: 3, max: 150 },
+  /** Género: 3 a 80 caracteres. */
   genre: { min: 3, max: 80 },
+  /** Ejemplares: de 1 a 1000. */
   copies: { min: 1, max: 1000 },
   memberName: { min: 1, max: 100 }, // 1 o 2 caracteres se permiten con aviso (ver member-name.ts)
+  /** Correo: 6 a 150 caracteres. */
   email: { min: 6, max: 150 },
 } as const;
 

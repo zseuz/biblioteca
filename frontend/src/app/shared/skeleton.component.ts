@@ -1,7 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
+/**
+ * Bloque gris animado que ocupa el lugar del contenido mientras se carga («esqueleto»).
+ * Evita que la pantalla salte cuando llegan los datos.
+ */
 @Component({
   selector: 'app-skeleton',
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -43,6 +48,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   `,
 })
 export class SkeletonComponent {
+  /** Tamaño y bordes del bloque, en cualquier unidad CSS. */
   readonly width = input<string>('100%');
   readonly height = input<string>('1rem');
   readonly radius = input<string>('var(--radius-sm)');
