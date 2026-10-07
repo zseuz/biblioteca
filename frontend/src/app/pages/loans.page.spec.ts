@@ -154,6 +154,30 @@ describe('LoansPage', () => {
     req.flush(page([quijote], { size: 20, totalElements: 25, totalPages: 2 }));
   });
 
+  it('el libro se elige con un buscador que filtra por título o autor', async () => {
+    const fixture = await create();
+    fixture.componentInstance.openCreateModal();
+    await fixture.whenStable();
+
+    const input = document.getElementById('book') as HTMLInputElement;
+    expect(input.getAttribute('role')).toBe('combobox');
+
+    // Al escribir el autor aparece el libro, con sus ejemplares disponibles.
+    input.value = 'cervantes';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    const options = Array.from(document.querySelectorAll('.combo-list [role="option"]'));
+    expect(options.map((o) => o.querySelector('.combo-label')?.textContent?.trim())).toEqual(['El Quijote']);
+    expect(options[0].querySelector('.combo-desc')?.textContent).toContain('2 disponibles');
+
+    (options[0] as HTMLElement).click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form.controls.bookId.value).toBe('1');
+    expect(input.value).toBe('El Quijote');
+
+    fixture.componentInstance.closeModal();
+  });
+
   it('no registra préstamo si faltan campos obligatorios', async () => {
     const fixture = await create();
     fixture.componentInstance.lend();
