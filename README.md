@@ -20,7 +20,14 @@ npm install
 npm start
 ```
 
-Al primer arranque se cargan datos de ejemplo (6 libros, 3 usuarios, algunos préstamos).
+Al primer arranque se cargan datos de ejemplo: 6 libros, 3 usuarios y seis meses de historial
+de préstamos, para que las gráficas muestren tendencias desde el inicio.
+Además, en cada arranque se garantizan (sin duplicarlos) dos **registros de prueba** asociados
+al usuario `prueba@biblioteca.test`:
+
+- **"1984"**: un único ejemplar prestado → aparece como **agotado**.
+- **"Rayuela"**: prestado hace 20 días con plazo de 14 → aparece como **vencido**.
+
 La base se guarda en `backend/data/` (ignorada por git); bórrala para reiniciar los datos.
 
 ## Tests
@@ -84,6 +91,18 @@ préstamos, autenticación (Spring Security + JWT) y documentación OpenAPI.
 - No se puede eliminar un libro o usuario que tenga historial de préstamos.
 - No se puede reducir el total de ejemplares por debajo de los que están prestados.
 
+## Validación del nombre de usuario
+
+| Capa | Regla |
+|---|---|
+| HTML | `required` y `maxlength="100"` en el campo |
+| Angular | `required`, sin solo espacios y `maxLength(100)`, con contador de caracteres |
+| Backend | `@NotBlank` y `@Size(max = 100)` en `MemberRequest` → 400 con el mensaje del campo |
+
+Si el nombre contiene números o tiene un solo carácter (letra o número) **no se bloquea**,
+porque puede ser legítimo: la interfaz muestra un aviso y pide confirmar el nombre antes de
+registrarlo.
+
 ## API
 
 | Método | Ruta | Descripción |
@@ -98,9 +117,19 @@ préstamos, autenticación (Spring Security + JWT) y documentación OpenAPI.
 
 ## Estadísticas propuestas
 
-Totales (libros, usuarios, préstamos activos y vencidos), **libros más prestados**,
-**préstamos por género** y **usuarios más activos**. Responden a preguntas reales de una
-biblioteca: qué comprar más, qué géneros interesan y a quién hay que reclamar devoluciones.
+| Gráfica | Pregunta que responde |
+|---|---|
+| Totales (libros, usuarios, activos, vencidos) | ¿Cómo está la biblioteca hoy? |
+| **Préstamos por mes** (últimos 6, columnas) | ¿Sube o baja la circulación? |
+| **Estado de los préstamos** (devueltos / al día / vencidos) | ¿Cuánto hay que reclamar? |
+| **Libros más prestados** | ¿Qué títulos conviene comprar? |
+| **Préstamos por género** (con %) | ¿Qué categorías interesan más? |
+| **Usuarios más activos** | ¿Quiénes son los lectores frecuentes? |
+
+Las gráficas son componentes propios en SVG/HTML (sin librerías): adaptables al ancho,
+con tooltip por ratón y teclado, una vista de tabla accesible en cada tarjeta y una paleta
+validada para daltonismo y contraste en los temas claro y oscuro. Las agregaciones se hacen
+en la base de datos y la serie mensual se rellena con ceros para no saltar meses.
 
 ## Frontend
 
@@ -108,6 +137,13 @@ Rutas: `/libros`, `/usuarios`, `/prestamos`, `/estadisticas` (carga diferida).
 Validaciones en formularios, un interceptor HTTP que traduce los errores de la API a mensajes
 claros (incluido "servidor apagado"), diseño responsivo, etiquetas asociadas a cada campo,
 navegación por teclado, foco visible, enlace "saltar al contenido" y avisos con `aria-live`.
+
+- **Tema claro / oscuro** con un selector en la cabecera.
+- **Responsive sin scroll horizontal:** las tablas ocultan columnas secundarias en pantallas
+  medianas y se convierten en tarjetas en móvil; la navegación pasa a 4 pestañas.
+- **Menú de acciones (⋮)** reutilizable en cada fila o tarjeta, accesible por teclado.
+- **Buscador de usuarios (combobox)** en los préstamos: muestra todos al hacer clic y filtra
+  al escribir por nombre o correo, sin importar tildes.
 
 ## Flujo de Git
 
