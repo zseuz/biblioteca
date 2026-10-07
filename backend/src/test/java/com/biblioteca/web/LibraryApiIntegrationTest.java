@@ -102,6 +102,15 @@ class LibraryApiIntegrationTest {
     }
 
     @Test
+    void openApiDocumentationIsPublished() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title", is("API del Sistema de Biblioteca")))
+                .andExpect(jsonPath("$.paths['/api/loans'].post.summary", is("Prestar un libro")))
+                .andExpect(jsonPath("$.components.schemas.ApiError").exists());
+    }
+
+    @Test
     void malformedJsonReturns400() throws Exception {
         mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content("{no es json"))
                 .andExpect(status().isBadRequest());
