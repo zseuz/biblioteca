@@ -1,6 +1,7 @@
 import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { SILENT_ERRORS } from './error.interceptor';
 import {
   Book,
@@ -16,7 +17,8 @@ import {
   Stats,
 } from './models';
 
-export const API_URL = 'http://localhost:8080/api';
+/** URL base de la API: localhost en desarrollo, el backend publicado en producción. */
+export const API_URL = environment.apiUrl;
 
 const silentErrors = () => new HttpContext().set(SILENT_ERRORS, true);
 
