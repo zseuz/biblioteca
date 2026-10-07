@@ -8,6 +8,7 @@ import java.time.YearMonth;
  */
 public record MonthCount(int year, int month, long count) {
 
+    /** Año y mes como un solo valor, para ordenar y completar la serie de meses. */
     public YearMonth yearMonth() {
         return YearMonth.of(year, month);
     }

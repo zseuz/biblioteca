@@ -18,6 +18,7 @@ public final class TextSearch {
     /** Equivalente sin acento de cada letra de {@link #ACCENTS}, en el mismo orden. */
     static final String PLAIN = "aeiouunaeiouaeiouaeioc";
 
+    /** Clase de utilidades estáticas: no se crean instancias. */
     private TextSearch() {
     }
 

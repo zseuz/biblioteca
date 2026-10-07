@@ -18,6 +18,7 @@ import { IconComponent, IconName } from './icon.component';
 export interface ActionMenuItem {
   /** Identificador que se emite al seleccionar la opción. */
   id: string;
+  /** Texto de la opción, p. ej. «Editar». */
   label: string;
   icon?: IconName;
   /** Acciones destructivas (eliminar) se muestran en rojo y separadas del resto. */
@@ -25,6 +26,7 @@ export interface ActionMenuItem {
   disabled?: boolean;
 }
 
+/** Separación en píxeles entre el botón ⋮ y el panel. */
 const GAP = 6;
 
 /**
@@ -41,6 +43,7 @@ const GAP = 6;
 @Component({
   selector: 'app-action-menu',
   imports: [IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button
@@ -197,13 +200,19 @@ export class ActionMenuComponent {
   /** Emite el {@code id} de la opción elegida. */
   readonly selected = output<string>();
 
+  /** Si el panel está abierto. */
   protected readonly open = signal(false);
+  /** Posición del panel en pantalla (fixed), calculada junto al botón al abrir. */
   protected readonly top = signal(0);
   protected readonly right = signal(0);
 
+  /** Elemento del propio componente, para detectar clics fuera del menú. */
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  /** Botón ⋮ (para colocar el panel y devolverle el foco al cerrar). */
   private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
+  /** Botones de las opciones (para moverse con las flechas). */
   private readonly menuItems = viewChildren<ElementRef<HTMLButtonElement>>('menuItem');
+  /** Panel desplegable. */
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
 
   constructor() {
@@ -218,6 +227,7 @@ export class ActionMenuComponent {
     inject(DestroyRef).onDestroy(() => this.panel()?.nativeElement.remove());
   }
 
+  /** Clic en ⋮: abre el panel o lo cierra si ya estaba abierto. */
   toggle(): void {
     if (this.open()) {
       this.close(false);
@@ -233,12 +243,14 @@ export class ActionMenuComponent {
     setTimeout(() => this.focusItem(index));
   }
 
+  /** Opción elegida: avisa al padre con su id y cierra el panel devolviendo el foco al botón. */
   choose(item: ActionMenuItem): void {
     if (item.disabled) return;
     this.close(true);
     this.selected.emit(item.id);
   }
 
+  /** Teclado dentro del panel: flechas para moverse, Inicio/Fin, Escape para cerrar y Tab para salir. */
   onMenuKeydown(event: KeyboardEvent): void {
     const items = this.enabledItems();
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -295,11 +307,16 @@ export class ActionMenuComponent {
     }
   }
 
+  /** Abre el panel colocado junto al botón. */
   private show(): void {
     this.position(this.trigger().nativeElement.getBoundingClientRect());
     this.open.set(true);
   }
 
+  /**
+   * Coloca el panel debajo del botón, alineado a su borde derecho; si no cabe abajo, lo abre
+   * hacia arriba.
+   */
   private position(rect: DOMRect): void {
     const estimatedHeight = this.items().length * 40 + 16;
     const fitsBelow = rect.bottom + GAP + estimatedHeight <= window.innerHeight;
@@ -309,6 +326,7 @@ export class ActionMenuComponent {
     this.top.set(fitsBelow ? rect.bottom + GAP : Math.max(8, rect.top - GAP - estimatedHeight));
   }
 
+  /** Cierra el panel; si se cerró con teclado, devuelve el foco al botón ⋮. */
   private close(restoreFocus: boolean): void {
     this.open.set(false);
     if (restoreFocus) {
@@ -316,12 +334,14 @@ export class ActionMenuComponent {
     }
   }
 
+  /** Opciones que se pueden elegir (omite las desactivadas). */
   private enabledItems(): HTMLButtonElement[] {
     return this.menuItems()
       .map((ref) => ref.nativeElement)
       .filter((el) => !el.disabled);
   }
 
+  /** Pone el foco en la opción indicada (-1 = la última). */
   private focusItem(index: number): void {
     const items = this.enabledItems();
     items.at(index)?.focus();

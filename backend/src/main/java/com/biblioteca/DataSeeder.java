@@ -46,12 +46,22 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Profile("!test")
 class DataSeeder {
 
+    /** Registro de mensajes en la consola (qué datos de ejemplo se crearon al arrancar). */
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+    /** Plazo usado para los préstamos de la demo (el mismo que la regla por defecto). */
     private static final int LOAN_DAYS = 14;
+    /**
+     * Correos de los usuarios de prueba. Sirven de «marca»: si el usuario ya existe, el registro de
+     * prueba correspondiente ya se creó y no se vuelve a crear (así el sembrador es idempotente).
+     */
     static final String TEST_MEMBER_EMAIL = "prueba@biblioteca.test";
     static final String RENEWALS_MEMBER_EMAIL = "renovaciones@biblioteca.test";
     static final String RENEWABLE_MEMBER_EMAIL = "renovable@biblioteca.test";
 
+    /**
+     * Tarea que Spring ejecuta una vez al terminar de arrancar. Todo va en una sola transacción:
+     * si algo falla, no queda la base a medio cargar.
+     */
     @Bean
     CommandLineRunner seed(BookRepository books, MemberRepository members, LoanRepository loans,
                            TransactionTemplate tx, Clock clock, LibraryProperties properties) {
@@ -67,6 +77,10 @@ class DataSeeder {
         });
     }
 
+    /**
+     * Catálogo, usuarios y seis meses de historial de préstamos para la demo. Solo se ejecuta
+     * con la base vacía, para no mezclarse con datos reales.
+     */
     private void seedDemo(BookRepository books, MemberRepository members, LoanRepository loans, LocalDate today) {
         List<Book> b = books.saveAll(List.of(
                 new Book("Cien años de soledad", "Gabriel García Márquez", "Novela", 3),
@@ -186,11 +200,19 @@ class DataSeeder {
                 daysLeft, RENEWABLE_MEMBER_EMAIL);
     }
 
+    /**
+     * Crea un préstamo activo que empezó en {@code start}: descuenta un ejemplar del libro y
+     * fija el vencimiento a {@link #LOAN_DAYS} días, igual que haría el servicio.
+     */
     private static Loan activeLoan(Book book, Member member, LocalDate start) {
         book.borrowCopy();
         return new Loan(book, member, start, start.plusDays(LOAN_DAYS));
     }
 
+    /**
+     * Crea un préstamo ya devuelto {@code daysKept} días después de empezar. Pasa por
+     * {@code markReturned}, así que el ejemplar vuelve al stock como en un préstamo real.
+     */
     private static Loan returnedLoan(Book book, Member member, LocalDate start, int daysKept, LocalDate today) {
         Loan loan = activeLoan(book, member, start);
         LocalDate returnedOn = start.plusDays(daysKept);

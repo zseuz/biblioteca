@@ -4,6 +4,7 @@ import { percentOf } from './chart.models';
 
 /** Segmento de una {@link StackedBarChartComponent}. */
 export interface StackedSegment {
+  /** Identificador del segmento (también se usa en la leyenda). */
   key: string;
   label: string;
   count: number;
@@ -24,6 +25,7 @@ export interface StackedSegment {
 @Component({
   selector: 'app-stacked-bar-chart',
   imports: [IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="total">
@@ -193,17 +195,24 @@ export interface StackedSegment {
   `,
 })
 export class StackedBarChartComponent {
+  /** Partes de la barra (p. ej. devueltos, al día y vencidos) con su color e icono. */
   readonly segments = input.required<StackedSegment[]>();
+  /** Texto junto al número total, p. ej. «préstamos registrados». */
   readonly totalLabel = input<string>('en total');
+  /** Descripción para lectores de pantalla. */
   readonly ariaLabel = input<string>('Distribución');
 
+  /** Segmento resaltado al pasar el ratón por la barra o la leyenda. */
   protected readonly active = signal<string | null>(null);
+  /** Suma de todos los segmentos. */
   protected readonly total = computed(() => this.segments().reduce((sum, s) => sum + s.count, 0));
+  /** Cada segmento con su porcentaje del total (ancho en la barra). */
   protected readonly withShare = computed(() =>
     this.segments().map((s) => ({ ...s, share: percentOf(s.count, this.total()) })),
   );
   /** Solo los segmentos con valor ocupan espacio en la barra. */
   protected readonly visible = computed(() => this.withShare().filter((s) => s.count > 0));
+  /** Datos del segmento resaltado, para mostrar su detalle. */
   protected readonly activeSegment = computed(
     () => this.withShare().find((s) => s.key === this.active()) ?? null,
   );

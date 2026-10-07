@@ -29,12 +29,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class MemberService {
 
+    /** Registro de altas, cambios y bajas de usuarios en la consola. */
     private static final Logger log = LoggerFactory.getLogger(MemberService.class);
+    /** Mensaje único para el correo repetido (el frontend lo muestra junto al campo). */
     private static final String DUPLICATE_EMAIL = "Ya existe un usuario con ese correo";
 
+    /** Acceso a la tabla de usuarios. */
     private final MemberRepository members;
+    /** Acceso a préstamos: contadores por usuario y comprobación de historial antes de borrar. */
     private final LoanRepository loans;
 
+    /** Inyección por constructor (las dependencias son obligatorias y fáciles de simular en pruebas). */
     public MemberService(MemberRepository members, LoanRepository loans) {
         this.members = members;
         this.loans = loans;
@@ -100,6 +105,7 @@ public class MemberService {
         log.info("Usuario eliminado id={}", id);
     }
 
+    /** Busca el usuario o lanza {@link NotFoundException} (404). */
     private Member find(Long id) {
         return members.findById(id).orElseThrow(() -> new NotFoundException("Usuario no encontrado: " + id));
     }

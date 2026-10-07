@@ -1,10 +1,17 @@
 import { Injectable, effect, signal } from '@angular/core';
 
+/** Tema visual: claro u oscuro. */
 export type ThemeMode = 'light' | 'dark';
 
+/**
+ * Modo claro/oscuro. Pone {@code data-theme} en la etiqueta <html> (los colores de styles.css
+ * cambian según ese atributo) y recuerda la elección del usuario en el navegador.
+ */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
+  /** Clave con la que se guarda la preferencia en localStorage. */
   private readonly storageKey = 'biblioteca_theme_preference';
+  /** Tema actual. Al cambiar, el effect del constructor lo aplica y lo guarda. */
   readonly theme = signal<ThemeMode>(this.getInitialTheme());
 
   constructor() {
@@ -28,10 +35,12 @@ export class ThemeService {
     }
   }
 
+  /** Alterna entre claro y oscuro (botón de la luna/sol en la cabecera). */
   toggleTheme(): void {
     this.theme.update((current) => (current === 'light' ? 'dark' : 'light'));
   }
 
+  /** Tema al abrir la app: el guardado por el usuario o, si no hay, el del sistema operativo. */
   private getInitialTheme(): ThemeMode {
     if (typeof window === 'undefined') return 'light';
     try {

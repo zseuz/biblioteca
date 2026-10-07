@@ -38,22 +38,31 @@ import java.util.Objects;
 })
 public class Loan {
 
+    /** Identificador del préstamo, generado por la base de datos. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Bloqueo optimista: impide registrar dos veces la misma devolución o renovación simultánea. */
     @Version
     private long version;
 
+    /**
+     * Libro prestado. {@code LAZY}: no se carga hasta que se usa; las consultas que lo necesitan
+     * lo traen con {@code join fetch} para evitar consultas extra.
+     */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private Book book;
 
+    /** Usuario que tiene el libro (carga perezosa, como el libro). */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private Member member;
 
+    /** Día en que se prestó. No cambia al renovar. */
     @Column(nullable = false)
     private LocalDate loanDate;
 
+    /** Fecha límite de devolución. Al renovar pasa a ser «día de la renovación + 14». */
     @Column(nullable = false)
     private LocalDate dueDate;
 
@@ -85,6 +94,10 @@ public class Loan {
     protected Loan() {
     }
 
+    /**
+     * Crea un préstamo activo. El descuento del ejemplar lo hace quien lo crea
+     * ({@code Book.borrowCopy()}), para que la regla de stock esté en un solo sitio.
+     */
     public Loan(Book book, Member member, LocalDate loanDate, LocalDate dueDate) {
         this.book = book;
         this.member = member;
@@ -92,10 +105,15 @@ public class Loan {
         this.dueDate = dueDate;
     }
 
+    /** ¿Sigue sin devolverse? (incluye los vencidos) */
     public boolean isActive() {
         return returnDate == null;
     }
 
+    /**
+     * ¿Está vencido a la fecha {@code today}? Solo si sigue activo y ya pasó la fecha límite;
+     * el propio día del vencimiento todavía está en plazo.
+     */
     public boolean isOverdue(LocalDate today) {
         return isActive() && today.isAfter(dueDate);
     }
@@ -168,13 +186,16 @@ public class Loan {
         return renewal;
     }
 
+    /** Formatos de fecha y hora de los mensajes para el usuario (07/10/2026, 10:42). */
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
+    /** Fecha en formato dd/MM/yyyy para los mensajes de error. */
     private static String format(LocalDate date) {
         return date.format(DATE);
     }
 
+    /** Getters de solo lectura: el estado cambia solo con {@link #renew}, {@link #markReturned} y el constructor. */
     public Long getId() { return id; }
     public Book getBook() { return book; }
     public Member getMember() { return member; }
@@ -187,16 +208,19 @@ public class Loan {
     /** Historial de solo lectura; carga perezosa: usar dentro de una transacción. */
     public List<LoanRenewal> getRenewalHistory() { return Collections.unmodifiableList(renewalHistory); }
 
+    /** Igualdad por id de base de datos (segura con los proxies de Hibernate). */
     @Override
     public boolean equals(Object o) {
         return this == o || (o instanceof Loan other && id != null && Objects.equals(id, other.getId()));
     }
 
+    /** Constante por clase, coherente con {@link #equals}. */
     @Override
     public int hashCode() {
         return Loan.class.hashCode();
     }
 
+    /** Texto corto para los logs. */
     @Override
     public String toString() {
         return "Loan[id=" + id + ", dueDate=" + dueDate + ", returned=" + !isActive() + "]";

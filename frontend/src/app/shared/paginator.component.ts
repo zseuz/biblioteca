@@ -20,6 +20,7 @@ type PageItem = { kind: 'page'; index: number } | { kind: 'gap'; key: string };
 @Component({
   selector: 'app-paginator',
   imports: [IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="paginator" [attr.aria-label]="label()">
@@ -181,20 +182,29 @@ type PageItem = { kind: 'page'; index: number } | { kind: 'gap'; key: string };
 export class PaginatorComponent {
   /** Página actual (desde 0). */
   readonly page = input.required<number>();
+  /** Elementos por página. */
   readonly size = input.required<number>();
+  /** Elementos en total (para el texto «Mostrando 11–20 de 33»). */
   readonly totalElements = input.required<number>();
+  /** Número de páginas. */
   readonly totalPages = input.required<number>();
+  /** Opciones del selector «Por página». */
   readonly pageSizes = input<number[]>([10, 20, 50]);
   /** Desactiva los controles mientras se carga una página. */
   readonly disabled = input<boolean>(false);
+  /** Nombre accesible de la navegación (lo leen los lectores de pantalla). */
   readonly label = input<string>('Paginación');
 
+  /** Página elegida por el usuario (desde 0). El padre pide esa página al servidor. */
   readonly pageChange = output<number>();
+  /** Nuevo tamaño de página elegido. */
   readonly sizeChange = output<number>();
 
+  /** Primer elemento visible (1-based) para «Mostrando 11–20». */
   protected readonly from = computed(() =>
     this.totalElements() === 0 ? 0 : this.page() * this.size() + 1,
   );
+  /** Último elemento visible (nunca mayor que el total). */
   protected readonly to = computed(() =>
     Math.min((this.page() + 1) * this.size(), this.totalElements()),
   );
@@ -217,12 +227,14 @@ export class PaginatorComponent {
     return result;
   });
 
+  /** Ir a una página: ignora índices fuera de rango o la página actual. */
   protected go(index: number): void {
     if (index >= 0 && index < this.totalPages() && index !== this.page()) {
       this.pageChange.emit(index);
     }
   }
 
+  /** Cambio en el selector de tamaño de página. */
   protected onSize(event: Event): void {
     this.sizeChange.emit(Number((event.target as HTMLSelectElement).value));
   }

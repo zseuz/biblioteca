@@ -17,6 +17,7 @@ import { IconComponent, IconName } from './icon.component';
 
 /** Opción de un {@link ComboboxComponent}. */
 export interface ComboboxOption<T = number> {
+  /** Valor que recibe el formulario al elegir la opción (p. ej. el id del usuario). */
   value: T;
   /** Texto principal; es lo que queda escrito en el campo al seleccionar. */
   label: string;
@@ -53,7 +54,10 @@ const normalize = normalizeText; // sin mayúsculas ni tildes ("Pérez" coincide
 @Component({
   selector: 'app-combobox',
   imports: [IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // NG_VALUE_ACCESSOR registra este componente como «control de formulario»: así funciona con
+  // formControlName y [formControl] igual que un <input>.
   providers: [
     { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => ComboboxComponent), multi: true },
   ],
@@ -280,7 +284,9 @@ const normalize = normalizeText; // sin mayúsculas ni tildes ("Pérez" coincide
 export class ComboboxComponent<T = number> implements ControlValueAccessor {
   /** Opciones disponibles. */
   readonly options = input.required<ComboboxOption<T>[]>();
+  /** Texto de ayuda del campo vacío. */
   readonly placeholder = input<string>('Escribe para buscar...');
+  /** Mensaje de la lista cuando no hay opciones que mostrar. */
   readonly emptyText = input<string>('Sin coincidencias');
   /** Icono a mostrar en cada opción; si no se indica, se muestran las iniciales del texto. */
   readonly icon = input<IconName | null>(null);
@@ -300,14 +306,21 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
   /** Texto secundario de esa fila. */
   readonly newOptionHint = input<string>('Valor nuevo');
 
+  /** Id de la lista, para enlazarla con el campo (aria-controls). */
   protected readonly listId = `combobox-list-${nextId++}`;
+  /** Si la lista está desplegada. */
   protected readonly open = signal(false);
+  /** Texto que se ve en el campo (lo escrito o la etiqueta de la opción elegida). */
   protected readonly text = signal('');
+  /** Valor elegido (el que tiene el formulario). */
   protected readonly value = signal<T | null>(null);
+  /** Si el formulario desactivó el control. */
   protected readonly disabled = signal(false);
+  /** Opción resaltada al moverse con las flechas (-1 = ninguna). */
   protected readonly activeIndex = signal(-1);
   /** Mientras es {@code false} (recién abierto), se muestran todas las opciones. */
   private readonly filtering = signal(false);
+  /** Posición de la lista en pantalla (encima o debajo del campo, según el espacio). */
   protected readonly pos = signal<{ top: number | null; bottom: number | null; left: number; width: number; maxHeight: number }>({
     top: 0,
     bottom: null,
@@ -316,9 +329,12 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     maxHeight: 280,
   });
 
+  /** Campo de texto. */
   private readonly inputEl = viewChild.required<ElementRef<HTMLInputElement>>('input');
+  /** Lista desplegable (se mueve a <body> para que no la recorte una ventana modal). */
   private readonly listEl = viewChild<ElementRef<HTMLElement>>('list');
 
+  /** Funciones que entrega el formulario: avisan de un valor nuevo y de que el campo se tocó. */
   private onChange: (value: T | null) => void = () => {};
   private onTouched: () => void = () => {};
 
@@ -375,14 +391,17 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     this.syncText();
   }
 
+  /** El formulario entrega la función a llamar cuando cambia el valor. */
   registerOnChange(fn: (value: T | null) => void): void {
     this.onChange = fn;
   }
 
+  /** El formulario entrega la función a llamar cuando el campo pierde el foco. */
   registerOnTouched(fn: () => void): void {
     this.onTouched = fn;
   }
 
+  /** El formulario activa o desactiva el control. */
   setDisabledState(isDisabled: boolean): void {
     this.disabled.set(isDisabled);
   }
@@ -399,6 +418,7 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     this.scrollActiveIntoView();
   }
 
+  /** Botón de la flecha: abre o cierra la lista. */
   toggleFromButton(): void {
     if (this.open()) {
       this.hide();
@@ -408,6 +428,7 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     }
   }
 
+  /** El usuario escribe: filtra la lista y, con allowCustom, el texto pasa a ser el valor. */
   onInput(event: Event): void {
     this.text.set((event.target as HTMLInputElement).value);
     this.filtering.set(true);
@@ -426,6 +447,7 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     }
   }
 
+  /** Teclado: flechas para moverse, Enter para elegir, Escape para cerrar, Tab para salir. */
   onKeydown(event: KeyboardEvent): void {
     const count = this.filtered().length;
     switch (event.key) {
@@ -462,17 +484,20 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     }
   }
 
+  /** El campo pierde el foco: cierra la lista y marca el control como tocado. */
   onBlur(): void {
     this.hide();
     this.onTouched();
   }
 
+  /** Elige una opción (clic o Enter). */
   select(option: ViewOption<T>): void {
     this.commit(option.value);
     this.text.set(option.label); // evita que hide() trate el texto a medias como valor nuevo
     this.hide();
   }
 
+  /** Botón ×: vacía el campo y el valor, y deja el foco en el campo. */
   clear(): void {
     this.commit(this.emptyValue());
     this.text.set('');
@@ -480,10 +505,12 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     this.inputEl().nativeElement.focus();
   }
 
+  /** Id de cada opción, para aria-activedescendant (lector de pantalla). */
   protected optionId(index: number): string {
     return `${this.listId}-opt-${index}`;
   }
 
+  /** Iniciales para el círculo de cada opción, p. ej. «Ana Torres» → «AT». */
   protected initials(label: string): string {
     return label
       .split(/\s+/)
@@ -518,6 +545,7 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     return this.allowCustom() ? ('' as unknown as T) : null;
   }
 
+  /** Guarda un valor nuevo y avisa al formulario (si no cambió, no hace nada). */
   private commit(value: T | null): void {
     if (value === this.value()) return;
     this.value.set(value);
@@ -549,6 +577,7 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     });
   }
 
+  /** Desplaza la lista para que la opción resaltada quede visible. */
   private scrollActiveIntoView(): void {
     setTimeout(() => {
       document.getElementById(this.optionId(this.activeIndex()))?.scrollIntoView({ block: 'nearest' });
