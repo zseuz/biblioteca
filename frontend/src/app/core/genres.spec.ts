@@ -1,5 +1,6 @@
 import { COMMON_GENRES, mergeGenres } from './genres';
 
+/** Lista de géneros del formulario: sugeridos + los del catálogo, sin repetidos y en orden. */
 describe('mergeGenres', () => {
   it('incluye los géneros sugeridos aunque no haya libros', () => {
     const result = mergeGenres([]);

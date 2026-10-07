@@ -5,6 +5,14 @@ import { API_URL, ApiService } from './api.service';
 import { errorInterceptor, messageFor } from './error.interceptor';
 import { NotifyService } from './notify.service';
 
+/**
+ * Pruebas del servicio de API y del interceptor de errores: que cada método arme bien la
+ * URL y los parámetros, y que los errores del servidor se conviertan en mensajes legibles.
+ *
+ * Las pruebas no llaman al backend real: HttpTestingController captura cada petición
+ * (expectOne) y la prueba decide qué responder (flush para éxito, error para fallos de red).
+ * afterEach(http.verify) falla si quedó alguna petición sin responder.
+ */
 describe('ApiService', () => {
   let api: ApiService;
   let http: HttpTestingController;

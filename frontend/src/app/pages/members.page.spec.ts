@@ -6,9 +6,18 @@ import { SILENT_ERRORS } from '../core/error.interceptor';
 import { NotifyService } from '../core/notify.service';
 import { MembersPage } from './members.page';
 
+/**
+ * Pruebas de la pantalla Usuarios: validaciones (longitudes, correo), avisos de nombre con
+ * confirmación, correo repetido, borrado protegido, búsqueda sin tildes y sin conexión.
+ *
+ * Las pruebas no llaman al backend real: HttpTestingController captura cada petición
+ * (expectOne) y la prueba decide qué responder (flush para éxito, error para fallos de red).
+ * afterEach(http.verify) falla si quedó alguna petición sin responder.
+ */
 describe('MembersPage', () => {
   let http: HttpTestingController;
 
+  /** Monta la pantalla y responde la carga inicial con un usuario de ejemplo. */
   function create() {
     const fixture = TestBed.createComponent(MembersPage);
     fixture.detectChanges();

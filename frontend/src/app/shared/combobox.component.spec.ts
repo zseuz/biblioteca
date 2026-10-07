@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ComboboxComponent, ComboboxOption } from './combobox.component';
 
+/** Componente «anfitrión» de prueba: usa el buscador con un FormControl, como un formulario real. */
 @Component({
   imports: [ComboboxComponent, ReactiveFormsModule],
   template: `<app-combobox inputId="user" [formControl]="control" [options]="options" />`,
@@ -16,10 +17,15 @@ class HostComponent {
   ];
 }
 
+/**
+ * Buscador desplegable: abrir, filtrar sin tildes, elegir con teclado o ratón, restaurar al
+ * salir y el modo allowCustom (escribir un valor nuevo, como un género).
+ */
 describe('ComboboxComponent', () => {
   const labels = () =>
     Array.from(document.querySelectorAll('.combo-list .combo-label')).map((e) => e.textContent?.trim());
 
+  /** Monta el anfitrión y devuelve el campo y una función para escribir en él. */
   async function setup() {
     const fixture = TestBed.createComponent(HostComponent);
     await fixture.whenStable();

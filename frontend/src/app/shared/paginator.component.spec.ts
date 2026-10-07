@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { PaginatorComponent } from './paginator.component';
 
+/** Componente «anfitrión» de prueba que conecta el paginador con signals. */
 @Component({
   imports: [PaginatorComponent],
   template: `
@@ -22,7 +23,9 @@ class HostComponent {
   readonly newSize = signal<number | null>(null);
 }
 
+/** Paginador: texto «Mostrando…», páginas con «…», anterior/siguiente y cambio de tamaño. */
 describe('PaginatorComponent', () => {
+  /** Monta el anfitrión y devuelve el fixture. */
   async function setup() {
     const fixture = TestBed.createComponent(HostComponent);
     await fixture.whenStable();

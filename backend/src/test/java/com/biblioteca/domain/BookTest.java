@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
  */
 class BookTest {
 
+    /** Al cambiar el total de ejemplares, los que están prestados se respetan: los disponibles = total nuevo − prestados. */
     @Test
     void updateKeepsCopiesOnLoanWhenChangingTotal() {
         Book book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 3);
@@ -23,6 +24,7 @@ class BookTest {
         assertThat(book.getAvailableCopies()).as("5 totales - 1 prestado").isEqualTo(4);
     }
 
+    /** No se puede bajar el total por debajo de los ejemplares prestados (quedaría stock negativo). */
     @Test
     void updateRejectsTotalBelowCopiesOnLoan() {
         Book book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 3);
@@ -33,6 +35,7 @@ class BookTest {
                 .isInstanceOf(BusinessRuleException.class);
     }
 
+    /** Un libro agotado no se puede prestar: borrowCopy() lanza la regla de negocio. */
     @Test
     void cannotBorrowWithoutAvailableCopies() {
         Book book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -42,6 +45,7 @@ class BookTest {
         assertThatThrownBy(book::borrowCopy).isInstanceOf(BusinessRuleException.class);
     }
 
+    /** Devolver un ejemplar nunca deja más disponibles que el total (protege ante una devolución repetida). */
     @Test
     void returnCopyNeverExceedsTotal() {
         Book book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -51,6 +55,7 @@ class BookTest {
         assertThat(book.getAvailableCopies()).isEqualTo(1);
     }
 
+    /** Sumar ejemplares aumenta a la vez el total y los disponibles; una cantidad no positiva se rechaza. */
     @Test
     void addCopiesIncreasesTotalAndAvailable() {
         Book book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 1);
@@ -63,12 +68,14 @@ class BookTest {
         assertThatThrownBy(() -> book.addCopies(0)).isInstanceOf(BusinessRuleException.class);
     }
 
+    /** Los textos se guardan sin espacios sobrantes, para que la detección de duplicados sea fiable. */
     @Test
     void normalizeTrimsAndCollapsesWhitespace() {
         assertThat(Book.normalize("  Cien   años  de soledad ")).isEqualTo("Cien años de soledad");
         assertThat(Book.normalize(null)).isEmpty();
     }
 
+    /** No se puede crear un libro con 0 ejemplares. */
     @Test
     void requiresAtLeastOneCopy() {
         assertThatThrownBy(() -> new Book("Dune", "Frank Herbert", "Ciencia ficción", 0))
