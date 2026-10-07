@@ -55,7 +55,7 @@ Además: **tema claro / oscuro**, diseño **responsive** (escritorio, tableta y 
 | Capa | Tecnología |
 |---|---|
 | Frontend | Angular 22 (componentes standalone, signals, formularios reactivos), TypeScript, CSS |
-| Backend | Spring Boot 4.1 (Spring MVC, Spring Data JPA, Bean Validation, Actuator), Java 21 |
+| Backend | Spring Boot 4.1 (Spring MVC, Spring Data JPA, Bean Validation, Actuator), springdoc-openapi (Swagger UI), Java 21 |
 | Base de datos | H2 en archivo (no requiere instalar nada) |
 | Pruebas | JUnit 5, Mockito, MockMvc (backend) · Vitest (frontend) |
 
@@ -68,6 +68,8 @@ Además: **tema claro / oscuro**, diseño **responsive** (escritorio, tableta y 
 | <img src="docs/img/libros.jpg" alt="Catálogo de libros" /> | <img src="docs/img/prestamos-vencidos.jpg" alt="Préstamos vencidos" /> |
 | **Validación del nombre de usuario** | **Estadísticas en modo oscuro** |
 | <img src="docs/img/usuario-validacion.jpg" alt="Aviso de validación del nombre" /> | <img src="docs/img/estadisticas-oscuro.jpg" alt="Estadísticas en modo oscuro" /> |
+| **Historial paginado (página 2 de 3)** | **Documentación de la API (Swagger UI)** |
+| <img src="docs/img/prestamos-paginacion.jpg" alt="Historial de préstamos paginado" /> | <img src="docs/img/swagger.jpg" alt="Swagger UI con los endpoints de préstamos y usuarios" /> |
 
 <p align="center">
   <img src="docs/img/movil-libros.jpg" alt="Vista móvil con el menú de acciones" width="300" /><br/>
@@ -95,7 +97,7 @@ Puertos que usa la aplicación (deben estar libres):
 
 | Servicio | Puerto | URL |
 |---|---|---|
-| Backend (API) | `8080` | http://localhost:8080 |
+| Backend (API) | `8080` | http://localhost:8080 · documentación en http://localhost:8080/swagger-ui.html |
 | Frontend (web) | `4200` | http://localhost:4200 |
 
 ---
@@ -243,8 +245,10 @@ flowchart LR
         C -.-> EH
     end
     DB[("H2<br/>backend/data")]
+    SW["Swagger UI<br/>/swagger-ui.html"]
     B --> P
     I -- "HTTP + JSON" --> C
+    SW -. "prueba la API" .-> C
     R --> DB
 ```
 
@@ -338,6 +342,30 @@ stateDiagram-v2
 
 > Mientras un usuario tenga un préstamo **vencido**, no puede pedir más libros.
 
+### Historial de préstamos paginado
+
+Filtros, búsqueda, orden y paginación se resuelven en el servidor. El navegador solo recibe la página que muestra.
+
+```mermaid
+sequenceDiagram
+    actor U as Usuario
+    participant W as Angular
+    participant API as LoanController
+    participant DB as H2
+
+    U->>W: Cambia filtro, orden o página, o escribe en el buscador
+    Note over W: La búsqueda espera 300 ms sin teclear.<br/>Una consulta nueva cancela la anterior (switchMap).
+    W->>API: GET /api/loans?status=OVERDUE&q=&sort=dueDate&direction=asc&page=0&size=10
+    API->>API: Valida status, sort y direction (400 si no son válidos)
+    API->>DB: Datos de la página (join fetch) y total
+    DB-->>API: 10 filas + total de coincidencias
+    API-->>W: content, page, size, totalElements, totalPages
+    W-->>U: Tabla + «Mostrando 1–10 de N»
+    W->>API: GET /api/loans/summary (al cargar y tras prestar o devolver)
+    API-->>W: total, activos, vencidos, devueltos
+    W-->>U: Contadores de pestañas e indicadores
+```
+
 ### Eliminar un usuario
 
 ```mermaid
@@ -386,7 +414,8 @@ flowchart TD
 ### Préstamos
 
 - **Registrar préstamo:** el campo de usuario es un buscador. Al hacer clic muestra a todos los usuarios y al escribir filtra por nombre o correo, sin importar mayúsculas ni tildes.
-- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir).
+- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
+- **Ordenar:** haz clic en la cabecera de una columna (libro, usuario, fechas o estado).
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
 - **Devolver:** menú ⋮ → *Registrar devolución* (solo en préstamos activos o vencidos).
 
@@ -491,7 +520,7 @@ curl -X POST http://localhost:8080/api/members -H "Content-Type: application/jso
 
 | Código | Significado |
 |---|---|
-| `400` | Datos inválidos o JSON mal formado (`fields` indica qué campo falla) |
+| `400` | Datos inválidos (`fields` indica qué campo falla), JSON mal formado o parámetro no admitido (p. ej. `sort=password`) |
 | `404` | El recurso no existe |
 | `409` | Se incumple una regla de negocio o hubo un conflicto de concurrencia |
 | `500` | Error inesperado (mensaje genérico; el detalle queda en el log del servidor) |
@@ -526,11 +555,11 @@ biblioteca/
 │       ├── main/java/com/biblioteca/
 │       │   ├── web/                 Controladores REST
 │       │   ├── service/             Casos de uso y reglas de negocio
-│       │   ├── repository/          Acceso a datos (JPA)
+│       │   ├── repository/          Acceso a datos (JPA) y búsqueda paginada (LoanSearchRepositoryImpl)
 │       │   ├── domain/              Entidades: Book, Member, Loan
 │       │   ├── dto/                 Contratos de entrada y salida de la API
 │       │   ├── exception/           Errores y manejador global
-│       │   ├── config/              Parámetros de negocio (LibraryProperties)
+│       │   ├── config/              Parámetros de negocio (LibraryProperties) y Swagger (OpenApiConfig)
 │       │   └── DataSeeder.java      Datos de ejemplo y registros de prueba
 │       ├── main/resources/application.properties
 │       └── test/                    Tests unitarios y de integración
@@ -541,7 +570,7 @@ biblioteca/
 │       └── app/
 │           ├── core/                ApiService, interceptor, modelos, validaciones
 │           ├── pages/               Libros, Usuarios, Préstamos, Estadísticas
-│           └── shared/              Modal, menú ⋮, buscador, gráficas, iconos
+│           └── shared/              Modal, menú ⋮, buscador, paginador, gráficas, iconos
 └── docs/img/                        Capturas usadas en este README
 ```
 
@@ -558,6 +587,7 @@ Ajustes principales en `backend/src/main/resources/application.properties`. Todo
 | `library.loans.days` | `14` | `LIBRARY_LOANS_DAYS` | Días de plazo de un préstamo |
 | `library.loans.max-active` | `3` | `LIBRARY_LOANS_MAX_ACTIVE` | Préstamos activos por usuario |
 | `app.cors.allowed-origins` | `http://localhost:4200` | `CORS_ALLOWED_ORIGINS` | Origen permitido para el frontend |
+| `springdoc.swagger-ui.path` | `/swagger-ui.html` | `SPRINGDOC_SWAGGER_UI_PATH` | Ruta de la documentación interactiva |
 
 La URL de la API que usa el frontend está en `frontend/src/app/core/api.service.ts` (`API_URL`).
 
