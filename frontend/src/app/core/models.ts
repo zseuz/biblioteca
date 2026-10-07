@@ -77,6 +77,28 @@ export interface Loan {
   /** Veces que se renovó (cada renovación da de nuevo el plazo completo desde ese día). */
   renewals?: number;
   lastRenewedOn?: string | null;
+  /** Fecha y hora de la última renovación ("2026-10-07T10:42:05"); puede faltar en renovaciones antiguas. */
+  lastRenewedAt?: string | null;
+}
+
+/** Una renovación del historial. */
+export interface LoanRenewalEntry {
+  /** 1 = la primera renovación. */
+  number: number;
+  renewedAt: string;
+  previousDueDate: string;
+  newDueDate: string;
+  daysAdded: number;
+}
+
+/** Historial de renovaciones con los datos del préstamo inicial. */
+export interface LoanRenewalHistory {
+  loan: Loan;
+  /** Fecha límite con la que se registró el préstamo. */
+  originalDueDate: string;
+  renewals: LoanRenewalEntry[];
+  /** Renovaciones hechas antes de que se guardara el historial (sin detalle). */
+  unrecordedRenewals: number;
 }
 
 export interface StatEntry {

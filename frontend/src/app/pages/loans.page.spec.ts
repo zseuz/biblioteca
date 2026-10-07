@@ -277,4 +277,67 @@ describe('LoansPage', () => {
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Renovado 1 vez');
   });
+
+  describe('historial de renovaciones', () => {
+    const todayIso = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const confirmButtons = () =>
+      Array.from(document.querySelectorAll('.confirm-actions button')).map((b) => b.textContent?.trim());
+
+    it('al pulsar «Renovado N vez» muestra el préstamo inicial y cada renovación con su hora', async () => {
+      const fixture = await create();
+      fixture.componentInstance.openHistory({ ...quijote, renewals: 1 });
+      await fixture.whenStable();
+      expect(document.body.textContent).toContain('Cargando historial');
+
+      http.expectOne(`${API_URL}/loans/1/renewals`).flush({
+        loan: { ...quijote, dueDate: '2026-10-21', renewals: 1 },
+        originalDueDate: '2026-10-15',
+        unrecordedRenewals: 0,
+        renewals: [
+          { number: 1, renewedAt: '2026-10-07T10:42:05', previousDueDate: '2026-10-15', newDueDate: '2026-10-21', daysAdded: 6 },
+        ],
+      });
+      await fixture.whenStable();
+
+      const text = document.body.textContent ?? '';
+      expect(text).toContain('Préstamo inicial');
+      expect(text).toContain('01/10/2026'); // prestado el
+      expect(text).toContain('Renovación 1');
+      expect(text).toContain('07/10/2026 a las 10:42');
+      expect(text).toContain('+6 días');
+    });
+
+    it('si ya se renovó hoy, informa a qué hora y no permite renovar de nuevo', async () => {
+      const fixture = await create();
+      const today = todayIso();
+      fixture.componentInstance.onAction('renew', {
+        ...quijote,
+        renewals: 1,
+        lastRenewedOn: today,
+        lastRenewedAt: `${today}T10:42:05`,
+      });
+      await fixture.whenStable();
+
+      expect(document.querySelector('.confirm-message')?.textContent).toContain('ya se renovó hoy a las 10:42');
+      expect(confirmButtons()).toEqual(['Entendido']);
+      fixture.componentInstance.confirmRenew();
+      http.expectNone((r) => r.url.endsWith('/renew'));
+    });
+
+    it('si el servidor rechaza la renovación, el motivo aparece en el diálogo', async () => {
+      const fixture = await create();
+      fixture.componentInstance.onAction('renew', quijote);
+      fixture.componentInstance.confirmRenew();
+      http
+        .expectOne(`${API_URL}/loans/1/renew`)
+        .flush({ message: 'Este préstamo ya se renovó hoy a las 09:15' }, { status: 409, statusText: 'Conflict' });
+      await fixture.whenStable();
+
+      expect(document.querySelector('.confirm-error')?.textContent).toContain('a las 09:15');
+      expect(TestBed.inject(NotifyService).notice()).toBeNull(); // sin aviso duplicado detrás
+    });
+  });
 });
