@@ -1,5 +1,6 @@
 package com.biblioteca;
 
+import com.biblioteca.config.LibraryProperties;
 import com.biblioteca.domain.Book;
 import com.biblioteca.domain.Loan;
 import com.biblioteca.domain.Member;
@@ -50,7 +51,7 @@ class DataSeeder {
 
     @Bean
     CommandLineRunner seed(BookRepository books, MemberRepository members, LoanRepository loans,
-                           TransactionTemplate tx, Clock clock) {
+                           TransactionTemplate tx, Clock clock, LibraryProperties properties) {
         // Una sola transacción: los cambios de stock de los libros se guardan junto a los préstamos.
         return args -> tx.executeWithoutResult(status -> {
             LocalDate today = LocalDate.now(clock);
@@ -58,7 +59,7 @@ class DataSeeder {
                 seedDemo(books, members, loans, today);
             }
             ensureTestRecords(books, members, loans, today);
-            ensureRenewedLoan(books, members, loans, today);
+            ensureRenewedLoan(books, members, loans, today, properties.loans());
         });
     }
 
@@ -125,23 +126,35 @@ class DataSeeder {
     }
 
     /**
-     * "Fahrenheit 451": prestado hace 20 días y renovado tres veces (hace 15, 8 y 2 días, a
-     * distintas horas). Cada renovación se hizo estando en plazo, así que hoy sigue activo y
-     * vence dentro de 12 días. Usa {@link Loan#renew}, por lo que el historial queda igual que
-     * si se hubiera renovado desde la aplicación.
+     * "Fahrenheit 451": renovado tres veces y todavía activo. Cada renovación se hace el primer
+     * día en que la regla lo permite (cuando faltan {@code renewalWindowDays} días para el
+     * vencimiento), de modo que con el plazo y la ventana por defecto (14 y 5 días) el préstamo
+     * se hizo hace 29 días y se renovó hace 20, 11 y 2 días, y vence dentro de 12.
+     *
+     * <p>Usa {@link Loan#renew}, así que el historial queda igual que si se hubiera renovado
+     * desde la aplicación y las fechas siempre cumplen la regla, aunque se cambie la configuración.
      */
     private void ensureRenewedLoan(BookRepository books, MemberRepository members, LoanRepository loans,
-                                   LocalDate today) {
+                                   LocalDate today, LibraryProperties.Loans rules) {
         if (members.existsByEmail(RENEWALS_MEMBER_EMAIL)) {
             return;
+        }
+        int step = rules.days() - rules.renewalWindowDays(); // días entre una renovación y la siguiente
+        if (step <= 0) {
+            return; // con esta configuración renovar no amplía el plazo: no hay historial que simular
         }
         Member reader = members.save(new Member("Lector Renovaciones", RENEWALS_MEMBER_EMAIL));
         Book book = books.save(new Book("Fahrenheit 451", "Ray Bradbury", "Ciencia ficción", 2));
 
-        Loan loan = activeLoan(book, reader, today.minusDays(20));      // plazo original: hasta hace 6 días
-        loan.renew(today.minusDays(15).atTime(9, 15), LOAN_DAYS);        // → vence ayer
-        loan.renew(today.minusDays(8).atTime(16, 40), LOAN_DAYS);        // → vence en 6 días
-        loan.renew(today.minusDays(2).atTime(11, 5), LOAN_DAYS);         // → vence en 12 días
+        LocalDate start = today.minusDays(2L + 3L * step); // la tercera renovación fue hace 2 días
+        book.borrowCopy();
+        Loan loan = new Loan(book, reader, start, start.plusDays(rules.days()));
+        LocalDate renewalDay = loan.renewableFrom(rules.renewalWindowDays());
+        int[][] times = {{9, 15}, {16, 40}, {11, 5}};
+        for (int[] time : times) {
+            loan.renew(renewalDay.atTime(time[0], time[1]), rules.days(), rules.renewalWindowDays());
+            renewalDay = loan.renewableFrom(rules.renewalWindowDays());
+        }
         loans.save(loan); // guarda también las renovaciones (cascade)
         log.info("Registro de prueba creado: «Fahrenheit 451» con 3 renovaciones ({})", RENEWALS_MEMBER_EMAIL);
     }
