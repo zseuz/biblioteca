@@ -10,9 +10,19 @@ describe('BooksPage', () => {
   function create() {
     const fixture = TestBed.createComponent(BooksPage);
     fixture.detectChanges();
-    http.expectOne(r => r.url === `${API_URL}/books`).flush([
-      { id: 1, title: 'Dune', author: 'Frank Herbert', genre: 'Ciencia ficción', totalCopies: 2, availableCopies: 1, available: true },
-    ]);
+    http
+      .expectOne((r) => r.url === `${API_URL}/books`)
+      .flush([
+        {
+          id: 1,
+          title: 'Dune',
+          author: 'Frank Herbert',
+          genre: 'Ciencia ficción',
+          totalCopies: 2,
+          availableCopies: 1,
+          available: true,
+        },
+      ]);
     return fixture;
   }
 
@@ -39,18 +49,25 @@ describe('BooksPage', () => {
 
     http.expectNone(`${API_URL}/books`);
     expect(fixture.componentInstance.form.invalid).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('El título es obligatorio.');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'El título es obligatorio.',
+    );
   });
 
   it('crea el libro cuando el formulario es válido', () => {
     const fixture = create();
-    fixture.componentInstance.form.setValue({ title: 'Sapiens', author: 'Harari', genre: 'Historia', totalCopies: 1 });
+    fixture.componentInstance.form.setValue({
+      title: 'Sapiens',
+      author: 'Harari',
+      genre: 'Historia',
+      totalCopies: 1,
+    });
     fixture.componentInstance.save();
 
     const req = http.expectOne(`${API_URL}/books`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body.title).toBe('Sapiens');
     req.flush({});
-    http.expectOne(r => r.url === `${API_URL}/books`).flush([]);
+    http.expectOne((r) => r.url === `${API_URL}/books`).flush([]);
   });
 });

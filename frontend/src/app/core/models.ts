@@ -42,6 +42,9 @@ export interface Stats {
   totalMembers: number;
   activeLoans: number;
   overdueLoans: number;
+  returnedLoans: number;
+  /** Últimos 6 meses, del más antiguo al actual; label en formato ISO "2026-10". */
+  loansByMonth: StatEntry[];
   topBooks: StatEntry[];
   loansByGenre: StatEntry[];
   topMembers: StatEntry[];

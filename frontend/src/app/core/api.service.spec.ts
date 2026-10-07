@@ -12,7 +12,10 @@ describe('ApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(withInterceptors([errorInterceptor])), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClientTesting(),
+      ],
     });
     api = TestBed.inject(ApiService);
     http = TestBed.inject(HttpTestingController);
@@ -23,24 +26,26 @@ describe('ApiService', () => {
 
   it('envía el término de búsqueda como parámetro q', () => {
     api.listBooks('  dune ').subscribe();
-    const req = http.expectOne(r => r.url === `${API_URL}/books`);
+    const req = http.expectOne((r) => r.url === `${API_URL}/books`);
     expect(req.request.params.get('q')).toBe('dune');
     req.flush([]);
   });
 
   it('no envía q cuando la búsqueda está vacía', () => {
     api.listBooks('  ').subscribe();
-    const req = http.expectOne(r => r.url === `${API_URL}/books`);
+    const req = http.expectOne((r) => r.url === `${API_URL}/books`);
     expect(req.request.params.has('q')).toBe(false);
     req.flush([]);
   });
 
   it('muestra el mensaje de negocio devuelto por la API', () => {
     api.lend(1, 2).subscribe({ error: () => undefined });
-    http.expectOne(`${API_URL}/loans`).flush(
-      { status: 409, message: 'No hay ejemplares disponibles' },
-      { status: 409, statusText: 'Conflict' },
-    );
+    http
+      .expectOne(`${API_URL}/loans`)
+      .flush(
+        { status: 409, message: 'No hay ejemplares disponibles' },
+        { status: 409, statusText: 'Conflict' },
+      );
     expect(notify.notice()).toEqual({ kind: 'error', text: 'No hay ejemplares disponibles' });
   });
 
