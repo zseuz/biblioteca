@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-97%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-111%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -71,6 +71,11 @@ Además: botones de guardar que **no cambian de tamaño** mientras cargan (el in
 | <img src="docs/img/prestamos-paginacion.jpg" alt="Historial de préstamos paginado" /> | <img src="docs/img/swagger.jpg" alt="Swagger UI con los endpoints de préstamos y usuarios" /> |
 | **Libro ya registrado: sumar ejemplares** | **Mismo libro con otro género: confirmar** |
 | <img src="docs/img/libro-duplicado.jpg" alt="Aviso de libro ya registrado" /> | <img src="docs/img/libro-otro-genero.jpg" alt="Comparación de género antes de crear" /> |
+
+<p align="center">
+  <img src="docs/img/prestamo-repetido.jpg" alt="Aviso de préstamo repetido con las opciones Cancelar, Renovar existente y Prestar otro ejemplar" width="560" /><br/>
+  <em>Préstamo repetido: el usuario ya tiene ese libro sin devolver; se puede renovar el existente o prestar otro ejemplar</em>
+</p>
 
 <p align="center">
   <img src="docs/img/movil-libros.jpg" alt="Vista móvil con el menú de acciones" width="300" /><br/>
@@ -292,6 +297,8 @@ erDiagram
         date loanDate
         date dueDate "loanDate + 14 días"
         date returnDate "vacío mientras está activo"
+        int renewals "veces que se renovó"
+        date lastRenewedOn "última renovación"
         long version "bloqueo optimista"
     }
 ```
@@ -338,11 +345,31 @@ flowchart TD
     E -- No --> OK["201 · Préstamo creado<br/>vence en 14 días"]
 ```
 
+### Préstamo repetido y renovación
+
+Antes de registrar un préstamo, la web consulta si el usuario ya tiene **ese mismo libro sin devolver**. Si es así, avisa desde qué fecha lo tiene y deja decidir:
+
+```mermaid
+flowchart TD
+    A["Usuario y libro elegidos<br/>«Prestar»"] --> B["GET /api/loans/active<br/>?memberId=&bookId="]
+    B --> C{"¿Ya tiene ese libro<br/>sin devolver?"}
+    C -- No --> P["POST /api/loans<br/>préstamo normal"]
+    C -- Sí --> D{"¿El préstamo que tiene<br/>está vencido?"}
+    D -- Sí --> V["Aviso: debe devolverlo primero<br/>(solo «Entendido»)"]
+    D -- No --> E["Aviso: «ya lo tiene desde el dd/mm/aaaa»"]
+    E -- Cancelar --> X["No se registra nada"]
+    E -- Prestar otro ejemplar --> P
+    E -- Renovar existente --> R["POST /api/loans/{id}/renew<br/>vence hoy + 14 días"]
+```
+
+**Renovar** vuelve a dar el plazo completo **contando desde el día de la renovación** (la fecha del préstamo no cambia). Solo se renuevan préstamos **en plazo**: uno vencido debe devolverse. No hay límite de renovaciones, pero cada una queda registrada (`renewals` y `lastRenewedOn`) y la tabla muestra *Renovado N veces*.
+
 ### Ciclo de vida de un préstamo
 
 ```mermaid
 stateDiagram-v2
     [*] --> Activo: Se presta (se descuenta un ejemplar)
+    Activo --> Activo: Se renueva (vence 14 días después de hoy)
     Activo --> Vencido: Pasa la fecha límite sin devolverlo
     Activo --> Devuelto: Se devuelve (se repone el ejemplar)
     Vencido --> Devuelto: Se devuelve
@@ -445,6 +472,8 @@ flowchart TD
 - **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
 - **Ordenar:** haz clic en la cabecera de una columna (libro, usuario, fechas o estado).
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
+- **Préstamo repetido:** si el usuario ya tiene ese libro sin devolver, se avisa desde qué fecha lo tiene y se ofrecen tres opciones: *Cancelar*, *Renovar existente* o *Prestar otro ejemplar*. Si ese préstamo está vencido, solo se informa que debe devolverlo. El mismo aviso aparece en el préstamo rápido desde Libros.
+- **Renovar:** menú ⋮ → *Renovar (14 días desde hoy)*, solo en préstamos **en plazo**. Tras confirmar, la nueva fecha límite se muestra en el aviso y la tabla indica cuántas veces se ha renovado.
 - **Devolver:** menú ⋮ → *Registrar devolución* (solo en préstamos activos o vencidos).
 
 ### Estadísticas
@@ -465,6 +494,9 @@ flowchart TD
 | Préstamos activos por usuario | máximo 3 | `library.loans.max-active` |
 | Usuario con préstamos vencidos | no puede pedir más | — |
 | Libro sin ejemplares disponibles | no se presta | — |
+| Mismo libro ya prestado al usuario | se avisa y se pide confirmar (o renovar el existente) | — |
+| Renovación | solo préstamos en plazo; nuevo vencimiento = hoy + 14 días | `library.loans.days` |
+| Número de renovaciones | sin límite, queda registrado | — |
 
 ### Altas, bajas y ediciones
 
@@ -506,6 +538,8 @@ URL base: `http://localhost:8080/api`
 | `GET` | `/loans?status=&q=&sort=&direction=&page=&size=` | Historial **paginado** (ver tabla de parámetros) | 200 · 400 |
 | `GET` | `/loans/summary` | Contadores: total, activos, vencidos y devueltos | 200 |
 | `POST` | `/loans` | Presta un libro `{bookId, memberId}` | 201 · 400 · 404 · 409 |
+| `GET` | `/loans/active?memberId=&bookId=` | Préstamos sin devolver de un usuario para un libro (aviso de préstamo repetido) | 200 |
+| `POST` | `/loans/{id}/renew` | Renueva un préstamo en plazo: vence 14 días después de hoy | 200 · 404 · 409 |
 | `POST` | `/loans/{id}/return` | Registra la devolución | 200 · 404 · 409 |
 | `GET` | `/stats` | Indicadores y series para las gráficas | 200 |
 
@@ -569,8 +603,8 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
-| Backend (45 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (52 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado y estados de carga de los botones |
+| Backend (55 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
+| Frontend (56 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
