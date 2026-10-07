@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { Book, BookInput, Loan, Member, MemberInput, Stats } from './models';
 
 export const API_URL = 'http://localhost:8080/api';
@@ -50,7 +50,23 @@ export class ApiService {
   }
 
   // Estadísticas
+  /**
+   * Estadísticas del panel. Se normalizan los campos opcionales para que un backend con una
+   * versión anterior del contrato (sin la serie mensual) no rompa las gráficas con NaN.
+   */
   stats(): Observable<Stats> {
-    return this.http.get<Stats>(`${API_URL}/stats`);
+    return this.http.get<Partial<Stats>>(`${API_URL}/stats`).pipe(
+      map((s) => ({
+        totalBooks: s.totalBooks ?? 0,
+        totalMembers: s.totalMembers ?? 0,
+        activeLoans: s.activeLoans ?? 0,
+        overdueLoans: s.overdueLoans ?? 0,
+        returnedLoans: s.returnedLoans ?? 0,
+        loansByMonth: s.loansByMonth ?? [],
+        topBooks: s.topBooks ?? [],
+        loansByGenre: s.loansByGenre ?? [],
+        topMembers: s.topMembers ?? [],
+      })),
+    );
   }
 }
