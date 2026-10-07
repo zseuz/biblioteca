@@ -13,7 +13,9 @@ describe('App', () => {
   it('renderiza la navegación principal', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
-    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).map(a => a.textContent?.trim());
+    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).map(
+      (a) => a.textContent?.trim(),
+    );
     expect(links).toEqual(['Libros', 'Usuarios', 'Préstamos', 'Estadísticas']);
   });
 });

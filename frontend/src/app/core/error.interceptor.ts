@@ -10,7 +10,9 @@ export function messageFor(err: HttpErrorResponse): string {
   }
   const body = err.error as { message?: string; fields?: Record<string, string> } | null;
   if (body?.fields) {
-    return Object.entries(body.fields).map(([f, m]) => `${f}: ${m}`).join(' · ');
+    return Object.entries(body.fields)
+      .map(([f, m]) => `${f}: ${m}`)
+      .join(' · ');
   }
   return body?.message ?? `Error inesperado (${err.status})`;
 }
