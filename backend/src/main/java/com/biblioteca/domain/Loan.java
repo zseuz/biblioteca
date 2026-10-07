@@ -114,17 +114,29 @@ public class Loan {
     }
 
     /**
+     * Primer día en que se puede renovar: cuando faltan {@code windowDays} días o menos para el
+     * vencimiento. Antes de esa fecha la renovación no está permitida.
+     */
+    public LocalDate renewableFrom(int windowDays) {
+        return dueDate.minusDays(windowDays);
+    }
+
+    /**
      * Renueva el préstamo: la fecha límite pasa a ser {@code hoy + days}, es decir, el usuario
      * vuelve a tener el plazo completo contando desde hoy. La renovación queda en el historial
      * con su fecha y hora.
      *
-     * @param now fecha y hora de la renovación
+     * <p>Solo se puede renovar en los últimos {@code windowDays} días antes del vencimiento
+     * (incluido el propio día de vencimiento); antes, se informa desde qué fecha se podrá.
+     *
+     * @param now        fecha y hora de la renovación
+     * @param days       plazo que se vuelve a conceder
+     * @param windowDays días antes del vencimiento a partir de los cuales se permite renovar
      * @return la renovación registrada
-     * @throws BusinessRuleException si ya fue devuelto, si está vencido (debe devolverse), si ya
-     *                               se renovó hoy o si ya tiene el plazo completo (renovar no
-     *                               cambiaría nada)
+     * @throws BusinessRuleException si ya fue devuelto, si está vencido (debe devolverse) o si
+     *                               todavía no es el momento de renovar
      */
-    public LoanRenewal renew(LocalDateTime now, int days) {
+    public LoanRenewal renew(LocalDateTime now, int days, int windowDays) {
         LocalDate today = now.toLocalDate();
         if (!isActive()) {
             throw new BusinessRuleException("El préstamo ya fue devuelto");
@@ -133,16 +145,19 @@ public class Loan {
             throw new BusinessRuleException(
                     "No se puede renovar un préstamo vencido (venció el " + format(dueDate) + "): debe devolverse");
         }
-        if (today.equals(lastRenewedOn)) {
-            String at = lastRenewedAt == null ? "" : " a las " + lastRenewedAt.format(TIME);
-            throw new BusinessRuleException("Este préstamo ya se renovó hoy" + at + " y vence el "
-                    + format(dueDate) + ". Podrá renovarse de nuevo a partir de mañana");
+        LocalDate from = renewableFrom(windowDays);
+        if (today.isBefore(from)) {
+            String renewedToday = today.equals(lastRenewedOn)
+                    ? "Este préstamo ya se renovó hoy" + (lastRenewedAt == null ? "" : " a las " + lastRenewedAt.format(TIME)) + ". "
+                    : "";
+            throw new BusinessRuleException(renewedToday + "No es posible renovar hasta el " + format(from)
+                    + ": solo se puede renovar cuando faltan " + windowDays + " días o menos para el vencimiento"
+                    + " (vence el " + format(dueDate) + ")");
         }
         LocalDate newDueDate = today.plusDays(days);
         if (!newDueDate.isAfter(dueDate)) {
-            String reason = today.equals(loanDate) ? "se registró hoy y ya tiene" : "ya tiene";
-            throw new BusinessRuleException("El préstamo " + reason + " el plazo completo (vence el "
-                    + format(dueDate) + "). Podrá renovarse a partir de mañana");
+            // Solo ocurre si la ventana es mayor que el plazo: renovar no ampliaría nada.
+            throw new BusinessRuleException("El préstamo ya tiene el plazo completo: vence el " + format(dueDate));
         }
         LoanRenewal renewal = new LoanRenewal(this, now, dueDate, newDueDate);
         renewalHistory.add(renewal);

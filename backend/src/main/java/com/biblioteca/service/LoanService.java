@@ -69,7 +69,7 @@ public class LoanService {
     @Transactional(readOnly = true)
     public PageResponse<LoanResponse> search(LoanQuery query) {
         LocalDate today = today();
-        return loans.search(query, today).map(l -> LoanResponse.from(l, today));
+        return loans.search(query, today).map(l -> LoanResponse.from(l, today, rules.renewalWindowDays()));
     }
 
     /**
@@ -80,7 +80,7 @@ public class LoanService {
     public List<LoanResponse> activeLoansFor(Long memberId, Long bookId) {
         LocalDate today = today();
         return loans.findActiveByMemberAndBook(memberId, bookId).stream()
-                .map(l -> LoanResponse.from(l, today))
+                .map(l -> LoanResponse.from(l, today, rules.renewalWindowDays()))
                 .toList();
     }
 
@@ -88,16 +88,16 @@ public class LoanService {
      * Renueva un préstamo en plazo: vuelve a tener el plazo completo contando desde hoy.
      *
      * @throws NotFoundException     si el préstamo no existe
-     * @throws BusinessRuleException si ya fue devuelto, está vencido, ya se renovó hoy o ya tiene
-     *                               el plazo completo
+     * @throws BusinessRuleException si ya fue devuelto, está vencido o todavía faltan más de
+     *                               {@code renewalWindowDays} días para el vencimiento
      */
     public LoanResponse renew(Long loanId) {
         Loan loan = findWithDetails(loanId);
         LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
-        loan.renew(now, rules.days());
+        loan.renew(now, rules.days(), rules.renewalWindowDays());
         log.info("Renovación préstamo id={} nuevo vencimiento={} (renovación nº {})",
                 loanId, loan.getDueDate(), loan.getRenewals());
-        return LoanResponse.from(loan, now.toLocalDate());
+        return LoanResponse.from(loan, now.toLocalDate(), rules.renewalWindowDays());
     }
 
     /**
@@ -130,7 +130,7 @@ public class LoanService {
                     r.getPreviousDueDate(), r.getNewDueDate(),
                     ChronoUnit.DAYS.between(r.getPreviousDueDate(), r.getNewDueDate())));
         }
-        return new LoanRenewalHistory(LoanResponse.from(loan, today()), originalDueDate, entries, unrecorded);
+        return new LoanRenewalHistory(LoanResponse.from(loan, today(), rules.renewalWindowDays()), originalDueDate, entries, unrecorded);
     }
 
     private Loan findWithDetails(Long loanId) {
@@ -173,7 +173,7 @@ public class LoanService {
         book.borrowCopy();
         Loan loan = loans.save(new Loan(book, member, today, today.plusDays(rules.days())));
         log.info("Préstamo id={} libro={} usuario={} vence={}", loan.getId(), book.getId(), member.getId(), loan.getDueDate());
-        return LoanResponse.from(loan, today);
+        return LoanResponse.from(loan, today, rules.renewalWindowDays());
     }
 
     /**
@@ -190,7 +190,7 @@ public class LoanService {
         LocalDate today = today();
         loan.markReturned(today); // valida que siga activo y repone el ejemplar
         log.info("Devolución préstamo id={} (vencía {})", loanId, loan.getDueDate());
-        return LoanResponse.from(loan, today);
+        return LoanResponse.from(loan, today, rules.renewalWindowDays());
     }
 
     private LocalDate today() {

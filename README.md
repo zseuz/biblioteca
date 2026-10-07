@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-123%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-131%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -233,7 +233,7 @@ En **cada arranque**, de forma idempotente (nunca se duplican), se garantizan es
 |---|---|---|
 | **«1984»** de George Orwell | Su único ejemplar está prestado → **Agotado** | Libros → filtro *Agotados* |
 | **«Rayuela»** de Julio Cortázar | Prestado hace 20 días con plazo de 14 → **Vencido** | Préstamos → filtro *Vencidos* |
-| **«Fahrenheit 451»** de Ray Bradbury | Prestado hace 20 días y **renovado 3 veces** (hace 15, 8 y 2 días) → sigue **Activo** | Préstamos → *Renovado 3 veces* abre el historial |
+| **«Fahrenheit 451»** de Ray Bradbury | Prestado hace 29 días y **renovado 3 veces** (hace 20, 11 y 2 días, cada vez en el primer día permitido) → sigue **Activo** | Préstamos → *Renovado 3 veces* abre el historial |
 
 Los datos se guardan en `backend/data/` (no se sube a Git). **Para reiniciar la base de datos:** detén el backend, borra la carpeta `backend/data/` y vuelve a arrancarlo.
 
@@ -370,17 +370,19 @@ flowchart TD
     D -- No --> E["Aviso: «ya lo tiene desde el dd/mm/aaaa»"]
     E -- Cancelar --> X["No se registra nada"]
     E -- Prestar otro ejemplar --> P
-    E -- Renovar existente --> R["POST /api/loans/{id}/renew<br/>vence hoy + 14 días"]
+    E -- Renovar existente --> W{"¿Faltan 5 días o menos<br/>para su vencimiento?"}
+    W -- Sí --> R["POST /api/loans/{id}/renew<br/>vence hoy + 14 días"]
+    W -- No --> N["No es posible renovar hasta el dd/mm/aaaa<br/>(botón desactivado)"]
 ```
 
-**Renovar** vuelve a dar el plazo completo **contando desde el día de la renovación** (la fecha del préstamo no cambia). Solo se renuevan préstamos **en plazo**: uno vencido debe devolverse. No hay límite de renovaciones, pero solo se permite **una por día**: si se intenta otra vez el mismo día se informa a qué hora se renovó y que podrá hacerse a partir de mañana (lo mismo con un préstamo registrado hoy, que ya tiene el plazo completo). Cada renovación queda en el **historial** (tabla `loan_renewal`) con su fecha y hora, el vencimiento anterior y el nuevo.
+**Renovar** vuelve a dar el plazo completo **contando desde el día de la renovación** (la fecha del préstamo no cambia). Solo se renuevan préstamos **en plazo** (uno vencido debe devolverse) y **únicamente cuando faltan 5 días o menos para el vencimiento** (incluido el propio día de vencimiento). Antes de ese momento se informa *«No es posible renovar hasta el dd/mm/aaaa»*, que es la fecha de vencimiento menos 5 días. Eso incluye un préstamo recién hecho o recién renovado: tras renovar, el vencimiento queda a 14 días y no se podrá volver a renovar hasta 9 días después. No hay límite de renovaciones. Cada renovación queda en el **historial** (tabla `loan_renewal`) con su fecha y hora, el vencimiento anterior y el nuevo.
 
 ### Ciclo de vida de un préstamo
 
 ```mermaid
 stateDiagram-v2
     [*] --> Activo: Se presta (se descuenta un ejemplar)
-    Activo --> Activo: Se renueva (vence 14 días después de hoy)
+    Activo --> Activo: Se renueva con 5 días o menos de plazo (vence 14 días después de hoy)
     Activo --> Vencido: Pasa la fecha límite sin devolverlo
     Activo --> Devuelto: Se devuelve (se repone el ejemplar)
     Vencido --> Devuelto: Se devuelve
@@ -484,7 +486,7 @@ flowchart TD
 - **Orden:** por defecto se muestran primero los préstamos **más recientes** (fecha de préstamo descendente). Haz clic en la cabecera de una columna para ordenar por libro, usuario, fechas o estado; las fechas empiezan por la más reciente y un segundo clic invierte el orden.
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
 - **Préstamo repetido:** si el usuario ya tiene ese libro sin devolver, se avisa desde qué fecha lo tiene y se ofrecen tres opciones: *Cancelar*, *Renovar existente* o *Prestar otro ejemplar*. Si ese préstamo está vencido, solo se informa que debe devolverlo. El mismo aviso aparece en el préstamo rápido desde Libros. Mientras se muestra, la ventana de préstamo se oculta (no queda detrás) y reaparece con lo elegido si se cancela.
-- **Renovar:** menú ⋮ → *Renovar (14 días desde hoy)*, solo en préstamos **en plazo**. Tras confirmar, la nueva fecha límite se muestra en el aviso y la tabla indica cuántas veces se ha renovado. Si ya se renovó hoy (o se prestó hoy), en lugar de la confirmación aparece un aviso con la hora de la renovación y desde cuándo podrá renovarse.
+- **Renovar:** menú ⋮ → *Renovar (14 días desde hoy)*, solo en préstamos **en plazo**. Tras confirmar, la nueva fecha límite se muestra en el aviso y la tabla indica cuántas veces se ha renovado. Solo se puede cuando faltan **5 días o menos** para el vencimiento; antes, en lugar de la confirmación aparece el aviso *«No es posible renovar hasta el dd/mm/aaaa»* (y, si se renovó hoy, a qué hora). En el aviso de préstamo repetido, el botón *Renovar existente* queda desactivado con la misma información.
 - **Historial de renovaciones:** en la columna *Vence*, el enlace *Renovado N veces* abre el historial: arriba el **préstamo inicial** (fecha del préstamo, vencimiento original y vencimiento actual) y debajo cada renovación con su **fecha y hora** y cómo cambió la fecha límite (p. ej. *18/10/2026 → 21/10/2026, +3 días*).
 - **Devolver:** menú ⋮ → *Registrar devolución* (solo en préstamos activos o vencidos).
 
@@ -508,7 +510,8 @@ flowchart TD
 | Libro sin ejemplares disponibles | no se presta | — |
 | Mismo libro ya prestado al usuario | se avisa y se pide confirmar (o renovar el existente) | — |
 | Renovación | solo préstamos en plazo; nuevo vencimiento = hoy + 14 días | `library.loans.days` |
-| Número de renovaciones | sin límite, una por día; cada una queda en el historial con fecha y hora | — |
+| Cuándo se puede renovar | solo cuando faltan **5 días o menos** para el vencimiento; antes se informa desde qué fecha | `library.loans.renewal-window-days` |
+| Número de renovaciones | sin límite; cada una queda en el historial con fecha y hora | — |
 
 ### Altas, bajas y ediciones
 
@@ -551,7 +554,7 @@ URL base: `http://localhost:8080/api`
 | `GET` | `/loans/summary` | Contadores: total, activos, vencidos y devueltos | 200 |
 | `POST` | `/loans` | Presta un libro `{bookId, memberId}` | 201 · 400 · 404 · 409 |
 | `GET` | `/loans/active?memberId=&bookId=` | Préstamos sin devolver de un usuario para un libro (aviso de préstamo repetido) | 200 |
-| `POST` | `/loans/{id}/renew` | Renueva un préstamo en plazo: vence 14 días después de hoy (una vez por día) | 200 · 404 · 409 |
+| `POST` | `/loans/{id}/renew` | Renueva un préstamo en plazo cuando faltan 5 días o menos para vencer: vence 14 días después de hoy. Antes, 409 con la fecha desde la que se podrá | 200 · 404 · 409 |
 | `GET` | `/loans/{id}/renewals` | Historial: préstamo inicial y cada renovación con fecha, hora y vencimientos | 200 · 404 |
 | `POST` | `/loans/{id}/return` | Registra la devolución | 200 · 404 · 409 |
 | `GET` | `/stats` | Indicadores y series para las gráficas | 200 |
@@ -616,8 +619,8 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
-| Backend (60 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (una por día, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (63 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones y estados de carga de los botones |
+| Backend (65 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
+| Frontend (66 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
@@ -665,6 +668,7 @@ Ajustes principales en `backend/src/main/resources/application.properties`. Todo
 | `spring.datasource.url` | `jdbc:h2:file:./data/biblioteca` | `SPRING_DATASOURCE_URL` | Ubicación de la base de datos |
 | `library.loans.days` | `14` | `LIBRARY_LOANS_DAYS` | Días de plazo de un préstamo |
 | `library.loans.max-active` | `3` | `LIBRARY_LOANS_MAX_ACTIVE` | Préstamos activos por usuario |
+| `library.loans.renewal-window-days` | `5` | `LIBRARY_LOANS_RENEWAL_WINDOW_DAYS` | Un préstamo solo se renueva cuando faltan estos días o menos para vencer |
 | `app.cors.allowed-origins` | `http://localhost:4200` | `CORS_ALLOWED_ORIGINS` | Origen permitido para el frontend |
 | `springdoc.swagger-ui.path` | `/swagger-ui.html` | `SPRINGDOC_SWAGGER_UI_PATH` | Ruta de la documentación interactiva |
 

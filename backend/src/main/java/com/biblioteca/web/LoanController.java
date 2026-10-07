@@ -75,11 +75,12 @@ public class LoanController {
     }
 
     @Operation(summary = "Renovar un préstamo",
-            description = "Solo préstamos en plazo: la fecha límite pasa a ser hoy + el plazo configurado (14 días). "
-                    + "Cada renovación queda en el historial con su fecha y hora. Se permite una renovación por día.")
+            description = "Solo préstamos en plazo y cuando faltan 5 días o menos para el vencimiento (configurable): "
+                    + "la fecha límite pasa a ser hoy + el plazo configurado (14 días). Antes de ese momento responde "
+                    + "409 indicando desde qué fecha se podrá. Cada renovación queda en el historial con su fecha y hora.")
     @ApiResponse(responseCode = "200", description = "Préstamo renovado")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @ApiResponse(responseCode = "409", description = "Ya devuelto, vencido, ya renovado hoy o ya con el plazo completo",
+    @ApiResponse(responseCode = "409", description = "Ya devuelto, vencido o todavía no es el momento de renovar",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/renew")
     public LoanResponse renew(@PathVariable Long id) {
