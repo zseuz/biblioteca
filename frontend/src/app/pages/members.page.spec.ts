@@ -96,6 +96,58 @@ describe('MembersPage', () => {
     http.expectNone(`${API_URL}/members`);
   });
 
+  describe('eliminación', () => {
+    const withLoans = { id: 7, name: 'Ana Torres', email: 'ana@example.com', activeLoans: 2, totalLoans: 5 };
+    const noLoans = { id: 8, name: 'Bruno Díaz', email: 'bruno@example.com', activeLoans: 0, totalLoans: 0 };
+
+    it('si el usuario tiene préstamos, informa sin hacer la petición', async () => {
+      const fixture = create();
+      fixture.componentInstance.remove(withLoans);
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.canDelete()).toBe(false);
+      expect(document.body.textContent).toContain('No se puede eliminar');
+      expect(document.body.textContent).toContain('tiene 2 préstamos activos y 5 préstamos en su historial');
+      // Solo hay un botón ("Entendido"): no existe forma de lanzar la petición destinada a fallar.
+      const buttons = Array.from(document.querySelectorAll('.confirm-actions button')).map((b) =>
+        b.textContent?.trim(),
+      );
+      expect(buttons).toEqual(['Entendido']);
+
+      fixture.componentInstance.confirmDelete();
+      http.expectNone((r) => r.method === 'DELETE');
+    });
+
+    it('si no tiene préstamos, confirma y elimina', async () => {
+      const fixture = create();
+      fixture.componentInstance.remove(noLoans);
+      await fixture.whenStable();
+      expect(document.body.textContent).toContain('¿Seguro que deseas eliminar a «Bruno Díaz»?');
+
+      fixture.componentInstance.confirmDelete();
+      http.expectOne((r) => r.method === 'DELETE' && r.url === `${API_URL}/members/8`).flush(null);
+      http.expectOne(`${API_URL}/members`).flush([]);
+      expect(fixture.componentInstance.deleteDialogOpen()).toBe(false);
+    });
+
+    it('si el servidor la rechaza, muestra el motivo dentro del diálogo', async () => {
+      const fixture = create();
+      fixture.componentInstance.remove(noLoans);
+      fixture.componentInstance.confirmDelete();
+      http
+        .expectOne((r) => r.method === 'DELETE')
+        .flush(
+          { status: 409, message: 'No se puede eliminar un usuario con historial de préstamos' },
+          { status: 409, statusText: 'Conflict' },
+        );
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.deleteDialogOpen()).toBe(true);
+      expect(fixture.componentInstance.deleting()).toBe(false);
+      expect(document.querySelector('.confirm-error')?.textContent).toContain('historial de préstamos');
+    });
+  });
+
   it('crea el usuario cuando el formulario es válido', () => {
     const fixture = create();
     fixture.componentInstance.form.setValue({ name: 'Laura Gómez', email: 'laura@example.com' });

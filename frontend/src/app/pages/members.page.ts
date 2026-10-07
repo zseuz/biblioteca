@@ -8,7 +8,9 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
+import { messageFor } from '../core/error.interceptor';
 import { Member } from '../core/models';
 import { NAME_MAX, nameWarnings, notBlank } from '../core/member-name';
 import { NotifyService } from '../core/notify.service';
@@ -316,18 +318,17 @@ export type SortOrder = 'asc' | 'desc';
       (cancel)="reviewName()"
     />
 
-    <!-- Modal de Confirmación de Eliminación -->
+    <!-- Eliminación: confirmación o, si tiene préstamos, aviso informativo sin petición -->
     <app-confirm-dialog
       [open]="deleteDialogOpen()"
-      title="Eliminar usuario"
-      [message]="
-        '¿Estás seguro de que deseas eliminar a «' +
-        (memberToDelete()?.name ?? '') +
-        '»? Recuerda que no se pueden eliminar socios con historial de préstamos.'
-      "
+      [title]="canDelete() ? 'Eliminar usuario' : 'No se puede eliminar'"
+      [message]="deleteMessage()"
       confirmText="Eliminar"
-      variant="danger"
+      [cancelText]="canDelete() ? 'Cancelar' : 'Entendido'"
+      [showConfirm]="canDelete()"
+      [variant]="canDelete() ? 'danger' : 'primary'"
       [loading]="deleting()"
+      [error]="deleteError()"
       (confirm)="confirmDelete()"
       (cancel)="cancelDelete()"
     />
@@ -519,6 +520,34 @@ export class MembersPage implements OnInit {
   readonly deleteDialogOpen = signal(false);
   readonly memberToDelete = signal<Member | null>(null);
   readonly deleting = signal(false);
+  /** Motivo por el que el servidor rechazó la baja; se muestra dentro del diálogo. */
+  readonly deleteError = signal<string | null>(null);
+
+  /**
+   * Solo se eliminan usuarios sin historial (regla del backend). Se sabe de antemano gracias a
+   * los contadores del listado, así que no se hace una petición destinada a fallar.
+   */
+  readonly canDelete = computed(() => (this.memberToDelete()?.totalLoans ?? 0) === 0);
+
+  readonly deleteMessage = computed(() => {
+    const m = this.memberToDelete();
+    if (!m) return '';
+    if (this.canDelete()) {
+      return `¿Seguro que deseas eliminar a «${m.name}»? Esta acción no se puede deshacer.`;
+    }
+    const active = m.activeLoans ?? 0;
+    const total = m.totalLoans ?? 0;
+    const loans = (n: number) => `${n} ${n === 1 ? 'préstamo' : 'préstamos'}`;
+    const situation =
+      active > 0
+        ? `tiene ${loans(active)} ${active === 1 ? 'activo' : 'activos'}` +
+          (total > active ? ` y ${loans(total)} en su historial` : '')
+        : `tiene ${loans(total)} en su historial`;
+    return (
+      `«${m.name}» ${situation}. Para conservar la trazabilidad, solo se pueden eliminar ` +
+      'usuarios sin préstamos registrados.'
+    );
+  });
 
   // Búsqueda y Filtro
   readonly searchTerm = signal('');
@@ -698,14 +727,16 @@ export class MembersPage implements OnInit {
 
   remove(member: Member): void {
     this.memberToDelete.set(member);
+    this.deleteError.set(null);
     this.deleteDialogOpen.set(true);
   }
 
   confirmDelete(): void {
     const m = this.memberToDelete();
-    if (!m) return;
+    if (!m || !this.canDelete()) return;
 
     this.deleting.set(true);
+    this.deleteError.set(null);
     this.api.deleteMember(m.id).subscribe({
       next: () => {
         this.notify.ok('Usuario eliminado');
@@ -714,8 +745,10 @@ export class MembersPage implements OnInit {
         this.deleting.set(false);
         this.load();
       },
-      error: () => {
+      // Caso raro (p. ej. alguien le prestó un libro mientras tanto): el motivo se ve en el diálogo.
+      error: (err: HttpErrorResponse) => {
         this.deleting.set(false);
+        this.deleteError.set(messageFor(err));
       },
     });
   }
@@ -723,6 +756,7 @@ export class MembersPage implements OnInit {
   cancelDelete(): void {
     this.deleteDialogOpen.set(false);
     this.memberToDelete.set(null);
+    this.deleteError.set(null);
   }
 
   getInitials(name: string): string {
