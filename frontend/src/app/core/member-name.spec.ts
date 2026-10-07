@@ -1,6 +1,7 @@
 import { FormControl } from '@angular/forms';
 import { nameWarnings, notBlank } from './member-name';
 
+/** Avisos sobre el nombre de usuario (números, 1 o 2 caracteres) y el validador «sin solo espacios». */
 describe('member-name', () => {
   describe('nameWarnings', () => {
     it('no avisa con un nombre normal', () => {

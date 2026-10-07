@@ -71,6 +71,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
         loans.saveAll(all);
     }
 
+    /** Sin parámetros: primera página de 10, con los préstamos más recientes primero. */
     @Test
     void firstPageWithDefaultsShowsTheMostRecentLoansFirst() throws Exception {
         mvc.perform(get("/api/loans").param("size", "5"))
@@ -86,6 +87,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.content[4].bookTitle", is("Libro 05")));
     }
 
+    /** La última página trae solo los elementos que sobran. */
     @Test
     void lastPageContainsTheRemainder() throws Exception {
         mvc.perform(get("/api/loans").param("size", "5").param("page", "2"))
@@ -93,6 +95,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.page", is(2)));
     }
 
+    /** Filtros Activos, Vencidos y Devueltos (sin distinguir mayúsculas en el parámetro). */
     @Test
     void filtersByStatus() throws Exception {
         mvc.perform(get("/api/loans").param("status", "OVERDUE"))
@@ -104,6 +107,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.totalElements", is(4)));
     }
 
+    /** Búsqueda por título del libro o nombre del usuario, combinable con el filtro de estado. */
     @Test
     void searchesByBookTitleOrMemberNameIgnoringCase() throws Exception {
         mvc.perform(get("/api/loans").param("q", "libro 03"))
@@ -116,6 +120,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.totalElements", is(2)));
     }
 
+    /** La búsqueda ignora tildes en lo escrito y en los datos. */
     @Test
     void searchIgnoresAccentsInBothDirections() throws Exception {
         // Bruno Díaz tiene 6 préstamos: se encuentra con o sin tilde y en mayúsculas.
@@ -125,6 +130,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/loans").param("q", "dias")).andExpect(jsonPath("$.totalElements", is(0)));
     }
 
+    /** Las estadísticas cuentan como activos solo los préstamos en plazo, igual que el resumen. */
     @Test
     void statsCountOnlyInTimeLoansAsActiveLikeTheLoanSummary() throws Exception {
         // Mismos números que /api/loans/summary: 5 en plazo, 3 vencidos y 4 devueltos.
@@ -135,12 +141,14 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.returnedLoans", is(4)));
     }
 
+    /** «%» y «_» se buscan como texto, no como comodines de SQL. */
     @Test
     void wildcardCharactersAreSearchedLiterally() throws Exception {
         mvc.perform(get("/api/loans").param("q", "%")).andExpect(jsonPath("$.totalElements", is(0)));
         mvc.perform(get("/api/loans").param("q", "_")).andExpect(jsonPath("$.totalElements", is(0)));
     }
 
+    /** Ordena por las columnas permitidas en ambos sentidos. */
     @Test
     void sortsByWhitelistedFieldsInBothDirections() throws Exception {
         mvc.perform(get("/api/loans").param("sort", "bookTitle").param("direction", "desc").param("size", "2"))
@@ -153,6 +161,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.content[11].status", is("RETURNED")));
     }
 
+    /** El tamaño de página se acota entre 1 y 100, y una página negativa pasa a 0. */
     @Test
     void pageSizeIsClampedToTheAllowedRange() throws Exception {
         mvc.perform(get("/api/loans").param("size", "1000")).andExpect(jsonPath("$.size", is(100)));
@@ -160,6 +169,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/loans").param("page", "-3")).andExpect(jsonPath("$.page", is(0)));
     }
 
+    /** Orden, estado o sentido no válidos responden 400 con un mensaje claro. */
     @Test
     void invalidParametersReturn400WithAClearMessage() throws Exception {
         mvc.perform(get("/api/loans").param("sort", "password"))
@@ -169,6 +179,7 @@ class LoanSearchIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/loans").param("direction", "up")).andExpect(status().isBadRequest());
     }
 
+    /** El resumen devuelve total, en plazo, vencidos y devueltos en una sola llamada. */
     @Test
     void summaryCountsEveryStatusInOneCall() throws Exception {
         mvc.perform(get("/api/loans/summary"))

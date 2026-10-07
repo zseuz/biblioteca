@@ -4,9 +4,18 @@ import { TestBed } from '@angular/core/testing';
 import { API_URL } from '../core/api.service';
 import { StatsPage } from './stats.page';
 
+/**
+ * Pruebas de Estadísticas: indicadores, coherencia entre «activos» y «al día», panel sin datos
+ * y error de conexión.
+ *
+ * Las pruebas no llaman al backend real: HttpTestingController captura cada petición
+ * (expectOne) y la prueba decide qué responder (flush para éxito, error para fallos de red).
+ * afterEach(http.verify) falla si quedó alguna petición sin responder.
+ */
 describe('StatsPage', () => {
   let http: HttpTestingController;
 
+  /** Monta la pantalla y responde /api/stats con datos de ejemplo. */
   function create() {
     const fixture = TestBed.createComponent(StatsPage);
     fixture.detectChanges();
