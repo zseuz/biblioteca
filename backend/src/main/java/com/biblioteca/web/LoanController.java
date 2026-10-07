@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -60,6 +61,27 @@ public class LoanController {
             @Parameter(description = "Elementos por página (1-100)")
             @RequestParam(defaultValue = "" + LoanQuery.DEFAULT_SIZE) int size) {
         return service.search(LoanQuery.fromParams(status, q, sort, direction, page, size));
+    }
+
+    @Operation(summary = "Préstamos sin devolver de un usuario para un libro",
+            description = "Sirve para avisar antes de prestar otra vez el mismo libro al mismo usuario.")
+    @GetMapping("/active")
+    public List<LoanResponse> activeFor(
+            @Parameter(description = "Id del usuario", example = "1") @RequestParam Long memberId,
+            @Parameter(description = "Id del libro", example = "1") @RequestParam Long bookId) {
+        return service.activeLoansFor(memberId, bookId);
+    }
+
+    @Operation(summary = "Renovar un préstamo",
+            description = "Solo préstamos en plazo: la fecha límite pasa a ser hoy + el plazo configurado (14 días). "
+                    + "Se registra el número de renovaciones.")
+    @ApiResponse(responseCode = "200", description = "Préstamo renovado")
+    @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Ya devuelto, vencido o ya con el plazo completo",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @PostMapping("/{id}/renew")
+    public LoanResponse renew(@PathVariable Long id) {
+        return service.renew(id);
     }
 
     @Operation(summary = "Contadores por estado",
