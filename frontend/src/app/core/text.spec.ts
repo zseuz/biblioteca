@@ -1,5 +1,6 @@
 import { normalizeText } from './text';
 
+/** Normalización de texto de las búsquedas: sin mayúsculas, tildes ni espacios sobrantes. */
 describe('normalizeText', () => {
   it('ignora mayúsculas y tildes', () => {
     expect(normalizeText('García Márquez')).toBe('garcia marquez');

@@ -1,6 +1,7 @@
 import { FormControl } from '@angular/forms';
 import { integer, notBlank, textLength, validationMessage } from './validators';
 
+/** Validadores de los formularios (longitud sin espacios, enteros) y sus mensajes de error. */
 describe('validators', () => {
   describe('textLength', () => {
     const v = textLength(3, 5);

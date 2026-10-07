@@ -61,6 +61,7 @@ class LoanServiceTest {
         when(loans.save(any(Loan.class))).thenAnswer(i -> i.getArgument(0));
     }
 
+    /** Prestar crea un préstamo activo que vence en 14 días y descuenta un ejemplar. */
     @Test
     void lendsForConfiguredDaysAndTakesOneCopy() {
         LoanResponse loan = service.lend(new LoanRequest(1L, 2L));
@@ -71,6 +72,7 @@ class LoanServiceTest {
         assertThat(book.getAvailableCopies()).isZero();
     }
 
+    /** Libro agotado: se rechaza y no se guarda ningún préstamo (verify ... never()). */
     @Test
     void rejectsWhenNoCopiesAvailable() {
         book.borrowCopy();
@@ -81,6 +83,7 @@ class LoanServiceTest {
         verify(loans, never()).save(any());
     }
 
+    /** Usuario con 3 préstamos activos: se rechaza el cuarto sin gastar stock. */
     @Test
     void rejectsWhenMemberReachedMaxActiveLoans() {
         when(loans.countByMemberIdAndReturnDateIsNull(2L)).thenReturn((long) MAX_ACTIVE);
@@ -91,6 +94,7 @@ class LoanServiceTest {
         assertThat(book.getAvailableCopies()).as("no debe consumir stock al rechazar").isEqualTo(1);
     }
 
+    /** Usuario con préstamos vencidos: no puede pedir más. */
     @Test
     void rejectsWhenMemberHasOverdueLoans() {
         when(loans.existsByMemberIdAndReturnDateIsNullAndDueDateBefore(2L, TODAY)).thenReturn(true);
@@ -100,12 +104,14 @@ class LoanServiceTest {
                 .hasMessageContaining("vencidos");
     }
 
+    /** Libro o usuario inexistente: NotFoundException (la API responde 404). */
     @Test
     void rejectsUnknownBookOrMember() {
         assertThatThrownBy(() -> service.lend(new LoanRequest(99L, 2L))).isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> service.lend(new LoanRequest(1L, 99L))).isInstanceOf(NotFoundException.class);
     }
 
+    /** Devolver repone el ejemplar; una segunda devolución se rechaza y no vuelve a reponer. */
     @Test
     void returnRestoresStockAndCannotBeRepeated() {
         book.borrowCopy();
@@ -121,6 +127,7 @@ class LoanServiceTest {
         assertThat(book.getAvailableCopies()).as("una doble devolución no repone stock").isEqualTo(1);
     }
 
+    /** Un préstamo está vencido solo si sigue activo y ya pasó la fecha límite. */
     @Test
     void loanIsOverdueOnlyAfterDueDateWhileActive() {
         book.borrowCopy();
