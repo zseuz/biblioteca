@@ -9,12 +9,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.biblioteca.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -24,10 +22,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * <p>Cubren lo que los tests unitarios con mocks no pueden detectar: mapeo de entidades,
  * consultas JPQL, carga perezosa fuera de la transacción y el contrato JSON de la API.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class LibraryApiIntegrationTest {
+class LibraryApiIntegrationTest extends IntegrationTest {
 
     @Autowired
     private MockMvc mvc;
@@ -198,7 +193,7 @@ class LibraryApiIntegrationTest {
         mvc.perform(post("/api/books/{id}/copies", id).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fields.quantity").exists());
-        mvc.perform(post("/api/books/{id}/copies", 999).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
+        mvc.perform(post("/api/books/{id}/copies", 999_999).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
                 .andExpect(status().isNotFound());
     }
 
@@ -242,8 +237,8 @@ class LibraryApiIntegrationTest {
 
     @Test
     void unknownResourceReturns404() throws Exception {
-        mvc.perform(get("/api/books/{id}", 999)).andExpect(status().isNotFound());
-        mvc.perform(post("/api/loans/{id}/return", 999)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/books/{id}", 999_999)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/loans/{id}/return", 999_999)).andExpect(status().isNotFound());
     }
 
     @Test
