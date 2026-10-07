@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
 
+/** Prueba de humo del componente raíz: la aplicación se crea sin errores. */
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
