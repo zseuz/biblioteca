@@ -466,6 +466,15 @@ textarea::placeholder {
   opacity: 0.7;
 }
 
+/* Los buscadores tienen su propio botón para limpiar: se oculta el de los navegadores
+   (la "x" nativa de type="search") para que no aparezcan dos. */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 input.invalid,
 select.invalid,
 textarea.invalid {
