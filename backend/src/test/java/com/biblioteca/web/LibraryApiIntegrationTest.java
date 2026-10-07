@@ -132,6 +132,27 @@ class LibraryApiIntegrationTest {
     }
 
     @Test
+    void membersListIncludesLoanCountersSoTheUiKnowsWhoCanBeDeleted() throws Exception {
+        long bookId = createBook("Dune", "Frank Herbert", "Ciencia ficción", 3);
+        long ana = createMember("Ana", "ana@example.com");
+        createMember("Bruno", "bruno@example.com");
+        lend(bookId, ana).andExpect(status().isCreated());
+        long returnedLoan = idOf(lend(bookId, ana).andExpect(status().isCreated()));
+        mvc.perform(post("/api/loans/{id}/return", returnedLoan)).andExpect(status().isOk());
+
+        mvc.perform(get("/api/members"))
+                .andExpect(jsonPath("$[0].name", is("Ana")))
+                .andExpect(jsonPath("$[0].activeLoans", is(1)))
+                .andExpect(jsonPath("$[0].totalLoans", is(2)))
+                .andExpect(jsonPath("$[1].name", is("Bruno")))
+                .andExpect(jsonPath("$[1].activeLoans", is(0)))
+                .andExpect(jsonPath("$[1].totalLoans", is(0)));
+
+        // La regla se mantiene en el servidor aunque la interfaz ya lo anticipe.
+        mvc.perform(delete("/api/members/{id}", ana)).andExpect(status().isConflict());
+    }
+
+    @Test
     void searchMatchesTitleAuthorOrGenreIgnoringCase() throws Exception {
         createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
         createBook("Clean Code", "Robert C. Martin", "Tecnología", 1);
