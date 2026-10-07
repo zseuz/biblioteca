@@ -33,6 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>Préstamo renovado</b> (idempotente, con su propio usuario
  *       {@value #RENEWALS_MEMBER_EMAIL}): un préstamo activo con tres renovaciones en días
  *       distintos, para ver el historial de renovaciones.</li>
+ *   <li><b>Préstamo renovable</b> (idempotente, usuario {@value #RENEWABLE_MEMBER_EMAIL}): un
+ *       préstamo en plazo al que le quedan pocos días, para comprobar que ya se puede renovar.</li>
  * </ol>
  *
  * <p>Los préstamos se crean directamente (sin pasar por {@code LoanService}) porque el servicio
@@ -48,6 +50,7 @@ class DataSeeder {
     private static final int LOAN_DAYS = 14;
     static final String TEST_MEMBER_EMAIL = "prueba@biblioteca.test";
     static final String RENEWALS_MEMBER_EMAIL = "renovaciones@biblioteca.test";
+    static final String RENEWABLE_MEMBER_EMAIL = "renovable@biblioteca.test";
 
     @Bean
     CommandLineRunner seed(BookRepository books, MemberRepository members, LoanRepository loans,
@@ -60,6 +63,7 @@ class DataSeeder {
             }
             ensureTestRecords(books, members, loans, today);
             ensureRenewedLoan(books, members, loans, today, properties.loans());
+            ensureRenewableLoan(books, members, loans, today, properties.loans());
         });
     }
 
@@ -157,6 +161,29 @@ class DataSeeder {
         }
         loans.save(loan); // guarda también las renovaciones (cascade)
         log.info("Registro de prueba creado: «Fahrenheit 451» con 3 renovaciones ({})", RENEWALS_MEMBER_EMAIL);
+    }
+
+    /**
+     * "Cumbres borrascosas": préstamo en plazo al que le quedan pocos días (3 con la ventana por
+     * defecto de 5), por lo que <b>ya se puede renovar</b>. Sirve para comprobar la renovación;
+     * los demás préstamos activos todavía no están en la ventana y muestran el aviso de «No es
+     * posible renovar hasta…». La fecha se calcula con la configuración, así que sigue siendo
+     * renovable aunque se cambie {@code renewal-window-days}.
+     */
+    private void ensureRenewableLoan(BookRepository books, MemberRepository members, LoanRepository loans,
+                                     LocalDate today, LibraryProperties.Loans rules) {
+        if (members.existsByEmail(RENEWABLE_MEMBER_EMAIL)) {
+            return;
+        }
+        Member reader = members.save(new Member("Lector para Renovar", RENEWABLE_MEMBER_EMAIL));
+        Book book = books.save(new Book("Cumbres borrascosas", "Emily Brontë", "Novela", 2));
+
+        int daysLeft = Math.max(0, rules.renewalWindowDays() - 2);
+        LocalDate start = today.minusDays((long) rules.days() - daysLeft);
+        book.borrowCopy();
+        loans.save(new Loan(book, reader, start, start.plusDays(rules.days())));
+        log.info("Registro de prueba creado: «Cumbres borrascosas» renovable (vence en {} días) ({})",
+                daysLeft, RENEWABLE_MEMBER_EMAIL);
     }
 
     private static Loan activeLoan(Book book, Member member, LocalDate start) {
