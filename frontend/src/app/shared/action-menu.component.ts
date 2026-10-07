@@ -135,6 +135,7 @@ const GAP = 6;
       width: 100%;
       display: flex;
       align-items: center;
+      justify-content: flex-start; /* el estilo global de button centra el contenido */
       gap: 0.6rem;
       padding: 0.55rem 0.7rem;
       border: 0;
