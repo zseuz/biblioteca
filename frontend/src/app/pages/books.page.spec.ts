@@ -264,4 +264,72 @@ describe('BooksPage', () => {
     });
   });
 
+
+  describe('validaciones del formulario de libro', () => {
+    const errors = () => Array.from(document.querySelectorAll('app-modal .error')).map((e) => e.textContent?.trim());
+
+    /** Escribe en el campo de ejemplares como lo haría el usuario. */
+    const typeCopies = (value: string) => {
+      const el = document.getElementById('copies') as HTMLInputElement;
+      el.value = value;
+      el.dispatchEvent(new Event('input'));
+    };
+
+    async function fill(value: { title: string; author: string; genre: string; totalCopies: number }) {
+      const fixture = create();
+      fixture.componentInstance.openCreate();
+      fixture.componentInstance.form.setValue(value);
+      fixture.componentInstance.form.markAllAsTouched();
+      await fixture.whenStable();
+      return fixture;
+    }
+
+    it('con 900 caracteres dice que supera el máximo, no que es obligatorio', async () => {
+      const fixture = await fill({ title: 'd'.repeat(900), author: 'd'.repeat(900), genre: 'Novela', totalCopies: 1 });
+
+      expect(errors()).toEqual([
+        'El título no puede superar los 200 caracteres (tiene 900).',
+        'El autor no puede superar los 150 caracteres (tiene 900).',
+      ]);
+      expect(document.body.textContent).toContain('900/200');
+      fixture.componentInstance.save();
+      http.expectNone(isDuplicateCheck); // no se envía
+    });
+
+    it('avisa cuando el texto es demasiado corto (sin contar espacios)', async () => {
+      await fill({ title: '  V  ', author: 'Al', genre: 'XY', totalCopies: 1 });
+
+      expect(errors()).toEqual([
+        'El título debe tener al menos 2 caracteres (tiene 1).',
+        'El autor debe tener al menos 3 caracteres (tiene 2).',
+        'El género debe tener al menos 3 caracteres (tiene 2).',
+      ]);
+    });
+
+    it('distingue los campos vacíos', async () => {
+      await fill({ title: '', author: '   ', genre: '', totalCopies: 1 });
+
+      expect(errors()).toEqual(['El título es obligatorio.', 'El autor es obligatorio.', 'El género es obligatorio.']);
+    });
+
+    it('valida el número de ejemplares: mínimo, máximo y enteros', async () => {
+      const fixture = await fill({ title: 'Dune', author: 'Frank Herbert', genre: 'Novela', totalCopies: 0 });
+      expect(errors()).toEqual(['El número de ejemplares debe ser al menos 1.']);
+
+      typeCopies('1001');
+      await fixture.whenStable();
+      expect(errors()).toEqual(['El número de ejemplares no puede ser mayor que 1000.']);
+
+      typeCopies('1.5');
+      await fixture.whenStable();
+      expect(errors()).toEqual(['El número de ejemplares debe ser un número entero.']);
+    });
+
+    it('acepta los valores en los límites exactos', async () => {
+      const fixture = await fill({ title: 'It', author: 'Ana', genre: 'Arte', totalCopies: 1000 });
+      expect(errors()).toEqual([]);
+      expect(fixture.componentInstance.form.valid).toBe(true);
+    });
+  });
+
 });

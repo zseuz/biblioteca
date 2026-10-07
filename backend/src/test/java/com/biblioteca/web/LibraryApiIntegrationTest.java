@@ -100,6 +100,49 @@ class LibraryApiIntegrationTest {
         // No se bloquean: la interfaz pide confirmación, pero pueden ser nombres legítimos.
         createMember("Juan Pablo 2", "jp2@example.com");
         createMember("X", "x@example.com");
+        createMember("Al", "al@example.com");
+    }
+
+    @Test
+    void bookFieldsHaveMinimumAndMaximumLengthsWithClearMessages() throws Exception {
+        String base = "{\"title\":\"%s\",\"author\":\"%s\",\"genre\":\"%s\",\"totalCopies\":%d}";
+
+        postBook(base.formatted("x".repeat(900), "Frank Herbert", "Novela", 1))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.title", is("El título debe tener entre 2 y 200 caracteres")));
+        postBook(base.formatted("V", "Frank Herbert", "Novela", 1))
+                .andExpect(jsonPath("$.fields.title", is("El título debe tener entre 2 y 200 caracteres")));
+        postBook(base.formatted("Dune", "Al", "Novela", 1))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.author", is("El autor debe tener entre 3 y 150 caracteres")));
+        postBook(base.formatted("Dune", "Frank Herbert", "XY", 1))
+                .andExpect(jsonPath("$.fields.genre", is("El género debe tener entre 3 y 80 caracteres")));
+        postBook(base.formatted("Dune", "Frank Herbert", "Novela", 1001))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.totalCopies", is("No puede haber más de 1000 ejemplares")));
+        postBook(base.formatted("Dune", "Frank Herbert", "Novela", 0))
+                .andExpect(jsonPath("$.fields.totalCopies", is("Debe haber al menos 1 ejemplar")));
+
+        // Los espacios no cuentan: «   a   » es un título de 1 carácter.
+        postBook(base.formatted("   a   ", "Frank Herbert", "Novela", 1))
+                .andExpect(jsonPath("$.fields.title", is("El título debe tener entre 2 y 200 caracteres")));
+
+        // En los límites exactos sí se acepta.
+        createBook("It", "Ana", "Cuento", 1000);
+        createBook("t".repeat(200), "a".repeat(150), "g".repeat(80), 1);
+    }
+
+    @Test
+    void memberEmailMustHaveBetweenSixAndOneHundredFiftyCharacters() throws Exception {
+        mvc.perform(post("/api/members").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ana\",\"email\":\"a@b.c\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.email").exists());
+        createMember("Ana", "a@b.co"); // 6 caracteres: válido
+    }
+
+    private ResultActions postBook(String json) throws Exception {
+        return mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content(json));
     }
 
     @Test

@@ -61,7 +61,7 @@ describe('MembersPage', () => {
     await fixture.whenStable();
 
     http.expectNone(`${API_URL}/members`);
-    expect(document.body.textContent).toContain('El nombre no puede superar los 100 caracteres.');
+    expect(document.body.textContent).toContain('El nombre no puede superar los 100 caracteres (tiene 101).');
   });
 
   it('pide confirmación si el nombre tiene números y guarda al confirmar', async () => {
@@ -220,6 +220,51 @@ describe('MembersPage', () => {
     expect(fixture.componentInstance.filteredMembers().map((m) => m.name)).toEqual(['María Gómez']);
     fixture.componentInstance.searchTerm.set('gomez');
     expect(fixture.componentInstance.filteredMembers().map((m) => m.name)).toEqual(['María Gómez']);
+  });
+
+
+  describe('validaciones del formulario', () => {
+    const errors = () => Array.from(document.querySelectorAll('app-modal .error')).map((e) => e.textContent?.trim());
+    /** Escribe en el campo como lo haría el usuario (el evento input repinta la pantalla). */
+    const typeInto = (id: string, value: string) => {
+      const el = document.getElementById(id) as HTMLInputElement;
+      el.value = value;
+      el.dispatchEvent(new Event('input'));
+    };
+
+    it('distingue un campo vacío de un correo mal escrito o demasiado corto', async () => {
+      const fixture = create();
+      fixture.componentInstance.openCreate();
+      const form = fixture.componentInstance.form;
+
+      form.setValue({ name: '', email: '' });
+      form.markAllAsTouched();
+      await fixture.whenStable();
+      expect(errors()).toEqual(['El nombre es obligatorio.', 'El correo es obligatorio.']);
+
+      form.setValue({ name: 'Ana', email: 'no-es-correo' });
+      await fixture.whenStable();
+      expect(errors()).toEqual(['Ingresa un correo válido, por ejemplo nombre@dominio.com.']);
+
+      typeInto('email', 'a@b.c');
+      await fixture.whenStable();
+      expect(errors()).toEqual(['El correo debe tener al menos 6 caracteres (tiene 5).']);
+
+      typeInto('email', 'a'.repeat(150) + '@example.com');
+      await fixture.whenStable();
+      expect(errors()[0]).toContain('El correo no puede superar los 150 caracteres (tiene 162)');
+    });
+
+    it('un nombre de 2 caracteres no es un error: pide confirmación, como el de una letra', async () => {
+      const fixture = create();
+      fixture.componentInstance.openCreate();
+      fixture.componentInstance.form.setValue({ name: 'Al', email: 'al@example.com' });
+      fixture.componentInstance.save();
+      await fixture.whenStable();
+
+      http.expectNone(`${API_URL}/members`); // todavía no guarda
+      expect(document.body.textContent).toContain('El nombre tiene solo 2 caracteres.');
+    });
   });
 
 });
