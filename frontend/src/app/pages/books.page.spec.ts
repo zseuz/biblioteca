@@ -119,6 +119,17 @@ describe('BooksPage', () => {
     http.expectOne(isList).flush([]);
   });
 
+  it('al eliminar, el título del libro aparece en negrita', async () => {
+    const fixture = create();
+    fixture.componentInstance.remove(dune);
+    await fixture.whenStable();
+
+    const message = document.querySelector('.confirm-message');
+    expect(message?.textContent).toContain('¿Estás seguro de que deseas eliminar Dune?');
+    expect(message?.querySelector('strong')?.textContent).toBe('Dune');
+    fixture.componentInstance.cancelDelete();
+  });
+
   it('volver al formulario conserva lo escrito y no guarda nada', async () => {
     const fixture = create();
     fixture.componentInstance.openCreate();
