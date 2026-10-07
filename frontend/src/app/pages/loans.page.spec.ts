@@ -242,6 +242,19 @@ describe('LoansPage', () => {
       expect(fixture.componentInstance.repeat()).toBeNull();
     });
 
+    it('oculta la ventana de préstamo mientras se muestra el aviso y la recupera al cancelar', async () => {
+      const fixture = await requestSameBook([quijote]);
+      const formText = 'Asigna un ejemplar a un socio registrado'; // subtítulo de la ventana de préstamo
+
+      expect(document.body.textContent).toContain('Este usuario ya tiene el libro');
+      expect(document.body.textContent).not.toContain(formText);
+
+      fixture.componentInstance.repeat.set(null);
+      await fixture.whenStable();
+      expect(document.body.textContent).toContain(formText);
+      expect(fixture.componentInstance.form.getRawValue()).toEqual({ memberId: '1', bookId: '1' });
+    });
+
     it('puede renovar el préstamo existente en lugar de prestar otro', async () => {
       const fixture = await requestSameBook([quijote]);
 
