@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-83%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-93%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -42,7 +42,7 @@
 
 | Módulo | Funcionalidad |
 |---|---|
-| **Libros** | Alta, edición, baja y búsqueda por título, autor o género. Control de ejemplares totales y disponibles, filtros (disponibles / agotados), vista de tabla o tarjetas y préstamo rápido. |
+| **Libros** | Alta, edición, baja y búsqueda por título, autor o género. Control de ejemplares totales y disponibles, filtros (disponibles / agotados), vista de tabla o tarjetas y préstamo rápido. **Detección de duplicados:** si el libro ya existe, ofrece sumar los ejemplares en vez de crear otro registro; si solo cambia el género, muestra la diferencia para confirmarla. |
 | **Usuarios** | Alta, edición y baja con validación del nombre y del correo (único). Los usuarios con préstamos no se pueden eliminar y la interfaz lo explica antes de intentarlo. |
 | **Préstamos** | Registro con buscador de usuarios, devolución, historial **paginado en el servidor** con filtros por estado, búsqueda y orden, y cálculo automático del vencimiento. |
 | **Estadísticas** | Indicadores clave y gráficas: préstamos por mes, estado de los préstamos, libros más prestados, préstamos por género y usuarios más activos. |
@@ -69,6 +69,8 @@ Además: **tema claro / oscuro**, diseño **responsive** (escritorio, tableta y 
 | <img src="docs/img/usuario-validacion.jpg" alt="Aviso de validación del nombre" /> | <img src="docs/img/estadisticas-oscuro.jpg" alt="Estadísticas en modo oscuro" /> |
 | **Historial paginado (página 2 de 3)** | **Documentación de la API (Swagger UI)** |
 | <img src="docs/img/prestamos-paginacion.jpg" alt="Historial de préstamos paginado" /> | <img src="docs/img/swagger.jpg" alt="Swagger UI con los endpoints de préstamos y usuarios" /> |
+| **Libro ya registrado: sumar ejemplares** | **Mismo libro con otro género: confirmar** |
+| <img src="docs/img/libro-duplicado.jpg" alt="Aviso de libro ya registrado" /> | <img src="docs/img/libro-otro-genero.jpg" alt="Comparación de género antes de crear" /> |
 
 <p align="center">
   <img src="docs/img/movil-libros.jpg" alt="Vista móvil con el menú de acciones" width="300" /><br/>
@@ -365,6 +367,24 @@ sequenceDiagram
     W-->>U: Contadores de pestañas e indicadores
 ```
 
+### Registrar un libro (detección de duplicados)
+
+```mermaid
+flowchart TD
+    A["Formulario «Nuevo libro» válido"] --> B["GET /api/books/duplicates<br/>título, autor y género"]
+    B --> C{"¿Existe el mismo título,<br/>autor y género?"}
+    C -- Sí --> D["Aviso «Este libro ya está registrado»<br/>con el total resultante"]
+    D -- "Añadir N ejemplares" --> E["POST /api/books/{id}/copies<br/>(total y disponibles + N)"]
+    D -- "Volver al formulario" --> A
+    C -- No --> F{"¿Mismo título y autor<br/>con otro género?"}
+    F -- Sí --> G["Comparación lado a lado<br/>con el género resaltado"]
+    G -- "Sí, es correcto: crear" --> H["POST /api/books"]
+    G -- "Revisar" --> A
+    F -- No --> H
+```
+
+No se distinguen mayúsculas ni espacios sobrantes: «  cien años DE soledad » es el mismo libro que «Cien años de soledad». Aunque alguien llame a la API sin pasar por la interfaz, el backend rechaza con `409` crear o editar un libro idéntico a otro.
+
 ### Eliminar un usuario
 
 ```mermaid
@@ -402,6 +422,7 @@ flowchart TD
 - **Buscar:** escribe en el buscador (título, autor o género). Combina la búsqueda con el filtro de género y con *Todos / Disponibles / Agotados*.
 - **Ordenar:** haz clic en la cabecera de una columna.
 - **Vista:** alterna entre tabla y tarjetas con los iconos de la derecha.
+- **Libro repetido:** si registras un libro que ya existe (mismo título, autor y género), en lugar de duplicarlo se ofrece **sumar los ejemplares** que ibas a ingresar. Si solo cambia el género, se muestra la diferencia para que confirmes si es correcta o la corrijas.
 - **Acciones (⋮):** *Prestar* (solo si hay ejemplares), *Editar* y *Eliminar*. Un libro con historial de préstamos no se puede eliminar.
 
 ### Usuarios
@@ -437,7 +458,9 @@ flowchart TD
 | Usuario con préstamos vencidos | no puede pedir más | — |
 | Libro sin ejemplares disponibles | no se presta | — |
 
-### Bajas y ediciones
+### Altas, bajas y ediciones
+
+- No puede haber dos libros con el mismo **título, autor y género** (sin distinguir mayúsculas ni espacios): se suman ejemplares al existente. El mismo título y autor con **otro género** sí se permite, previa confirmación.
 
 - No se puede eliminar un **libro** o un **usuario** con historial de préstamos (para conservar la trazabilidad).
 - No se puede reducir el total de ejemplares de un libro por debajo de los que están prestados.
@@ -463,9 +486,11 @@ URL base: `http://localhost:8080/api`
 |---|---|---|---|
 | `GET` | `/books?q=texto` | Lista o busca libros | 200 |
 | `GET` | `/books/{id}` | Detalle de un libro | 200 · 404 |
-| `POST` | `/books` | Crea un libro | 201 · 400 |
+| `POST` | `/books` | Crea un libro (409 si ya existe el mismo título, autor y género) | 201 · 400 · 409 |
 | `PUT` | `/books/{id}` | Edita un libro | 200 · 400 · 404 · 409 |
 | `DELETE` | `/books/{id}` | Elimina un libro sin historial | 204 · 404 · 409 |
+| `GET` | `/books/duplicates?title=&author=&genre=` | Comprueba si ya existe: `sameBook` (idéntico) y `differentGenre` | 200 |
+| `POST` | `/books/{id}/copies` | Suma ejemplares `{quantity}` (1-1000) a un libro existente | 200 · 400 · 404 |
 | `GET` | `/members` | Lista usuarios con `activeLoans` y `totalLoans` | 200 |
 | `POST` | `/members` | Crea un usuario | 201 · 400 · 409 |
 | `PUT` | `/members/{id}` | Edita un usuario | 200 · 400 · 404 · 409 |
@@ -536,8 +561,8 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
-| Backend (38 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas) y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (45 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador y consultas al servidor |
+| Backend (45 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
+| Frontend (48 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor y aviso de libro duplicado |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
