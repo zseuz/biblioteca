@@ -77,7 +77,7 @@ class LoanSearchIntegrationTest {
     }
 
     @Test
-    void firstPageWithDefaultsIsSortedByDueDateAscending() throws Exception {
+    void firstPageWithDefaultsShowsTheMostRecentLoansFirst() throws Exception {
         mvc.perform(get("/api/loans").param("size", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(5)))
@@ -85,8 +85,10 @@ class LoanSearchIntegrationTest {
                 .andExpect(jsonPath("$.size", is(5)))
                 .andExpect(jsonPath("$.totalElements", is(12)))
                 .andExpect(jsonPath("$.totalPages", is(3)))
-                // El que vence antes es el devuelto más antiguo (Libro 12).
-                .andExpect(jsonPath("$.content[0].bookTitle", is("Libro 12")));
+                // Por fecha de préstamo descendente: Libro 01 (hace 1 día), Libro 02 (hace 2)...
+                .andExpect(jsonPath("$.content[0].bookTitle", is("Libro 01")))
+                .andExpect(jsonPath("$.content[1].bookTitle", is("Libro 02")))
+                .andExpect(jsonPath("$.content[4].bookTitle", is("Libro 05")));
     }
 
     @Test
