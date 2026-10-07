@@ -12,6 +12,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
 import { mergeGenres } from '../core/genres';
+import { LIMITS, integer, notBlank, textLength, validationMessage } from '../core/validators';
 import { formatIsoDate } from '../core/renewal';
 import { Book, BookInput, Loan, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
@@ -367,30 +368,42 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       <form [formGroup]="form" (ngSubmit)="save()" id="book-form" novalidate>
         <div class="form-stack">
           <div class="form-group">
-            <label for="title">Título del libro *</label>
+            <div class="label-row">
+              <label for="title">Título del libro *</label>
+              <span class="char-count" [class.over]="lengthOf('title') > limits.title.max" aria-hidden="true">
+                {{ lengthOf('title') }}/{{ limits.title.max }}
+              </span>
+            </div>
             <input
               id="title"
               formControlName="title"
               placeholder="Ej. Cien años de soledad"
               [class.invalid]="invalid('title')"
               [attr.aria-invalid]="invalid('title')"
+              aria-describedby="title-error"
             />
             @if (invalid('title')) {
-              <p class="error"><app-icon name="alert" [size]="13" /> El título es obligatorio.</p>
+              <p class="error" id="title-error"><app-icon name="alert" [size]="13" /> {{ errorFor('title') }}</p>
             }
           </div>
 
           <div class="form-group">
-            <label for="author">Autor *</label>
+            <div class="label-row">
+              <label for="author">Autor *</label>
+              <span class="char-count" [class.over]="lengthOf('author') > limits.author.max" aria-hidden="true">
+                {{ lengthOf('author') }}/{{ limits.author.max }}
+              </span>
+            </div>
             <input
               id="author"
               formControlName="author"
               placeholder="Ej. Gabriel García Márquez"
               [class.invalid]="invalid('author')"
               [attr.aria-invalid]="invalid('author')"
+              aria-describedby="author-error"
             />
             @if (invalid('author')) {
-              <p class="error"><app-icon name="alert" [size]="13" /> El autor es obligatorio.</p>
+              <p class="error" id="author-error"><app-icon name="alert" [size]="13" /> {{ errorFor('author') }}</p>
             }
           </div>
 
@@ -410,7 +423,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
                 newOptionHint="Género nuevo"
               />
               @if (invalid('genre')) {
-                <p class="error"><app-icon name="alert" [size]="13" /> El género es obligatorio.</p>
+                <p class="error"><app-icon name="alert" [size]="13" /> {{ errorFor('genre') }}</p>
               }
             </div>
 
@@ -420,14 +433,14 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
                 id="copies"
                 type="number"
                 min="1"
+                max="1000"
+                step="1"
                 formControlName="totalCopies"
                 [class.invalid]="invalid('totalCopies')"
                 [attr.aria-invalid]="invalid('totalCopies')"
               />
               @if (invalid('totalCopies')) {
-                <p class="error">
-                  <app-icon name="alert" [size]="13" /> Debe haber al menos 1 ejemplar.
-                </p>
+                <p class="error"><app-icon name="alert" [size]="13" /> {{ errorFor('totalCopies') }}</p>
               }
             </div>
           </div>
@@ -564,6 +577,21 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       display: block;
       font-weight: 600;
       color: var(--text);
+    }
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .char-count {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .char-count.over {
+      color: var(--danger);
+      font-weight: 700;
     }
     .genre-tag {
       display: inline-block;
@@ -852,12 +880,31 @@ export class BooksPage implements OnInit {
     ...this.actionsWithoutLoan,
   ];
 
+  /** Límites de cada campo (los mismos que valida el backend). */
+  protected readonly limits = {
+    title: LIMITS.title,
+    author: LIMITS.author,
+    genre: LIMITS.genre,
+    totalCopies: LIMITS.copies,
+  };
+
   readonly form = this.fb.group({
-    title: ['', [Validators.required, Validators.maxLength(200)]],
-    author: ['', [Validators.required, Validators.maxLength(150)]],
-    genre: ['', [Validators.required, Validators.maxLength(80)]],
-    totalCopies: [1, [Validators.required, Validators.min(1)]],
+    title: ['', [Validators.required, notBlank, textLength(LIMITS.title.min, LIMITS.title.max)]],
+    author: ['', [Validators.required, notBlank, textLength(LIMITS.author.min, LIMITS.author.max)]],
+    genre: ['', [Validators.required, notBlank, textLength(LIMITS.genre.min, LIMITS.genre.max)]],
+    totalCopies: [
+      1,
+      [Validators.required, Validators.min(LIMITS.copies.min), Validators.max(LIMITS.copies.max), integer],
+    ],
   });
+
+  /** Cómo se nombra cada campo en los mensajes de error. */
+  private static readonly FIELD_NAMES = {
+    title: 'El título',
+    author: 'El autor',
+    genre: 'El género',
+    totalCopies: 'El número de ejemplares',
+  } as const;
 
   // Computed state
   readonly genres = computed(() => {
@@ -920,6 +967,16 @@ export class BooksPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+  }
+
+  /** Mensaje del error de un campo: obligatorio, demasiado corto, demasiado largo o fuera de rango. */
+  errorFor(name: keyof typeof this.form.controls): string {
+    return validationMessage(BooksPage.FIELD_NAMES[name], this.form.controls[name].errors);
+  }
+
+  /** Caracteres escritos (sin espacios al inicio ni al final), para el contador. */
+  lengthOf(name: 'title' | 'author'): number {
+    return (this.form.controls[name].value ?? '').trim().length;
   }
 
   invalid(name: keyof typeof this.form.controls): boolean {

@@ -17,6 +17,12 @@ describe('member-name', () => {
       expect(nameWarnings(' 7 ')).toEqual(['El nombre es solo un número.']);
     });
 
+    it('avisa si el nombre tiene solo 2 caracteres, y suma el aviso de números si los tiene', () => {
+      expect(nameWarnings('Al')).toEqual(['El nombre tiene solo 2 caracteres.']);
+      expect(nameWarnings('A2')).toEqual(['El nombre tiene solo 2 caracteres.', 'El nombre contiene números.']);
+      expect(nameWarnings('Ana')).toEqual([]);
+    });
+
     it('no avisa con un campo vacío (eso es un error, no un aviso)', () => {
       expect(nameWarnings('')).toEqual([]);
       expect(nameWarnings(null)).toEqual([]);
