@@ -16,6 +16,7 @@ import com.biblioteca.repository.LoanRepository;
 import com.biblioteca.repository.MemberRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -64,6 +65,34 @@ public class LoanService {
     public PageResponse<LoanResponse> search(LoanQuery query) {
         LocalDate today = today();
         return loans.search(query, today).map(l -> LoanResponse.from(l, today));
+    }
+
+    /**
+     * Préstamos sin devolver de un usuario para un libro. Permite avisar antes de prestarle
+     * otra vez el mismo libro (se puede confirmar, cancelar o renovar el existente).
+     */
+    @Transactional(readOnly = true)
+    public List<LoanResponse> activeLoansFor(Long memberId, Long bookId) {
+        LocalDate today = today();
+        return loans.findActiveByMemberAndBook(memberId, bookId).stream()
+                .map(l -> LoanResponse.from(l, today))
+                .toList();
+    }
+
+    /**
+     * Renueva un préstamo en plazo: vuelve a tener el plazo completo contando desde hoy.
+     *
+     * @throws NotFoundException     si el préstamo no existe
+     * @throws BusinessRuleException si ya fue devuelto, está vencido o ya tiene el plazo completo
+     */
+    public LoanResponse renew(Long loanId) {
+        Loan loan = loans.findByIdWithDetails(loanId)
+                .orElseThrow(() -> new NotFoundException("Préstamo no encontrado: " + loanId));
+        LocalDate today = today();
+        loan.renew(today, rules.days());
+        log.info("Renovación préstamo id={} nuevo vencimiento={} (renovación nº {})",
+                loanId, loan.getDueDate(), loan.getRenewals());
+        return LoanResponse.from(loan, today);
     }
 
     /** Contadores por estado para las pestañas e indicadores. */

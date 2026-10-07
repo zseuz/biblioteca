@@ -89,6 +89,15 @@ export class ApiService {
   lend(bookId: number, memberId: number): Observable<Loan> {
     return this.http.post<Loan>(`${API_URL}/loans`, { bookId, memberId });
   }
+  /** Préstamos sin devolver de un usuario para un libro (para avisar de un préstamo repetido). */
+  activeLoansFor(memberId: number, bookId: number): Observable<Loan[]> {
+    const params = new HttpParams().set('memberId', memberId).set('bookId', bookId);
+    return this.http.get<Loan[]>(`${API_URL}/loans/active`, { params });
+  }
+  /** Renueva un préstamo en plazo: vuelve a tener 14 días desde hoy. */
+  renewLoan(id: number): Observable<Loan> {
+    return this.http.post<Loan>(`${API_URL}/loans/${id}/renew`, {});
+  }
   giveBack(id: number): Observable<Loan> {
     return this.http.post<Loan>(`${API_URL}/loans/${id}/return`, {});
   }

@@ -74,6 +74,9 @@ export interface Loan {
   dueDate: string;
   returnDate: string | null;
   status: LoanStatus;
+  /** Veces que se renovó (cada renovación da de nuevo el plazo completo desde ese día). */
+  renewals?: number;
+  lastRenewedOn?: string | null;
 }
 
 export interface StatEntry {

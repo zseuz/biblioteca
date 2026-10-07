@@ -52,6 +52,16 @@ public class Loan {
     /** {@code null} mientras el libro no ha sido devuelto. */
     private LocalDate returnDate;
 
+    /**
+     * Veces que se ha renovado. {@code columnDefinition} con valor por defecto para que
+     * {@code ddl-auto=update} pueda añadir la columna a bases que ya tienen préstamos.
+     */
+    @Column(nullable = false, columnDefinition = "integer default 0 not null")
+    private int renewals;
+
+    /** Fecha de la última renovación ({@code null} si nunca se renovó). */
+    private LocalDate lastRenewedOn;
+
     /** Requerido por JPA; no usar directamente. */
     protected Loan() {
     }
@@ -84,12 +94,39 @@ public class Loan {
         this.book.returnCopy();
     }
 
+    /**
+     * Renueva el préstamo: la fecha límite pasa a ser {@code today + days}, es decir, el usuario
+     * vuelve a tener el plazo completo contando desde hoy. Se registra cuántas veces se renovó.
+     *
+     * @throws BusinessRuleException si ya fue devuelto, si está vencido (debe devolverse) o si
+     *                               ya tiene el plazo completo (renovar no cambiaría nada)
+     */
+    public void renew(LocalDate today, int days) {
+        if (!isActive()) {
+            throw new BusinessRuleException("El préstamo ya fue devuelto");
+        }
+        if (isOverdue(today)) {
+            throw new BusinessRuleException(
+                    "No se puede renovar un préstamo vencido (venció el " + dueDate + "): debe devolverse");
+        }
+        LocalDate newDueDate = today.plusDays(days);
+        if (!newDueDate.isAfter(dueDate)) {
+            throw new BusinessRuleException(
+                    "El préstamo ya tiene el plazo completo: vence el " + dueDate);
+        }
+        this.dueDate = newDueDate;
+        this.renewals++;
+        this.lastRenewedOn = today;
+    }
+
     public Long getId() { return id; }
     public Book getBook() { return book; }
     public Member getMember() { return member; }
     public LocalDate getLoanDate() { return loanDate; }
     public LocalDate getDueDate() { return dueDate; }
     public LocalDate getReturnDate() { return returnDate; }
+    public int getRenewals() { return renewals; }
+    public LocalDate getLastRenewedOn() { return lastRenewedOn; }
 
     @Override
     public boolean equals(Object o) {
