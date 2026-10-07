@@ -2,7 +2,17 @@ import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { SILENT_ERRORS } from './error.interceptor';
-import { Book, BookInput, Loan, Member, MemberInput, Stats } from './models';
+import {
+  Book,
+  BookInput,
+  Loan,
+  LoanQueryParams,
+  LoanSummary,
+  Member,
+  MemberInput,
+  PageResponse,
+  Stats,
+} from './models';
 
 export const API_URL = 'http://localhost:8080/api';
 
@@ -44,8 +54,23 @@ export class ApiService {
   }
 
   // Préstamos
-  listLoans(): Observable<Loan[]> {
-    return this.http.get<Loan[]>(`${API_URL}/loans`);
+  /** Historial paginado: filtros, búsqueda, orden y paginación se resuelven en el servidor. */
+  searchLoans(query: LoanQueryParams): Observable<PageResponse<Loan>> {
+    let params = new HttpParams()
+      .set('status', query.status)
+      .set('sort', query.sort)
+      .set('direction', query.direction)
+      .set('page', query.page)
+      .set('size', query.size);
+    if (query.q.trim()) {
+      params = params.set('q', query.q.trim());
+    }
+    return this.http.get<PageResponse<Loan>>(`${API_URL}/loans`, { params });
+  }
+
+  /** Contadores por estado (total, activos, vencidos, devueltos). */
+  loanSummary(): Observable<LoanSummary> {
+    return this.http.get<LoanSummary>(`${API_URL}/loans/summary`);
   }
   lend(bookId: number, memberId: number): Observable<Loan> {
     return this.http.post<Loan>(`${API_URL}/loans`, { bookId, memberId });
