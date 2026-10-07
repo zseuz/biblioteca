@@ -16,9 +16,12 @@ import org.springframework.validation.annotation.Validated;
 public record LibraryProperties(@Valid @DefaultValue Loans loans) {
 
     /**
-     * @param days      días de plazo de cada préstamo
-     * @param maxActive máximo de préstamos activos simultáneos por usuario
+     * @param days              días de plazo de cada préstamo
+     * @param maxActive         máximo de préstamos activos simultáneos por usuario
+     * @param renewalWindowDays un préstamo solo se puede renovar cuando faltan esta cantidad de
+     *                          días o menos para su vencimiento (0 = solo el día del vencimiento)
      */
-    public record Loans(@DefaultValue("14") @Min(1) int days, @DefaultValue("3") @Min(1) int maxActive) {
+    public record Loans(@DefaultValue("14") @Min(1) int days, @DefaultValue("3") @Min(1) int maxActive,
+                        @DefaultValue("5") @Min(0) int renewalWindowDays) {
     }
 }
