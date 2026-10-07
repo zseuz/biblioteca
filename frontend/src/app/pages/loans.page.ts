@@ -7,11 +7,21 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
 import { ApiService } from '../core/api.service';
-import { Book, Loan, LoanStatus, Member } from '../core/models';
+import {
+  Book,
+  Loan,
+  LoanQueryParams,
+  LoanStatus,
+  LoanSummary,
+  Member,
+  PageResponse,
+} from '../core/models';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
+import { PaginatorComponent } from '../shared/paginator.component';
 import { ComboboxComponent, ComboboxOption } from '../shared/combobox.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
@@ -29,6 +39,7 @@ export type SortOrder = 'asc' | 'desc';
     ReactiveFormsModule,
     IconComponent,
     ActionMenuComponent,
+    PaginatorComponent,
     ComboboxComponent,
     ModalComponent,
     ConfirmDialogComponent,
@@ -97,7 +108,7 @@ export type SortOrder = 'asc' | 'desc';
             <button
               type="button"
               class="clear-search-btn"
-              (click)="searchTerm.set('')"
+              (click)="clearSearch()"
               aria-label="Limpiar búsqueda"
             >
               <app-icon name="close" [size]="14" />
@@ -112,15 +123,15 @@ export type SortOrder = 'asc' | 'desc';
             type="button"
             class="pill-btn"
             [class.active]="statusFilter() === 'ALL'"
-            (click)="statusFilter.set('ALL')"
+            (click)="setStatus('ALL')"
           >
-            Todos ({{ loans().length }})
+            Todos ({{ totalLoansCount() }})
           </button>
           <button
             type="button"
             class="pill-btn"
             [class.active]="statusFilter() === 'ACTIVE'"
-            (click)="statusFilter.set('ACTIVE')"
+            (click)="setStatus('ACTIVE')"
           >
             Activos ({{ activeLoansCount() }})
           </button>
@@ -129,7 +140,7 @@ export type SortOrder = 'asc' | 'desc';
             class="pill-btn"
             [class.active]="statusFilter() === 'OVERDUE'"
             [class.pill-danger]="overdueLoansCount() > 0"
-            (click)="statusFilter.set('OVERDUE')"
+            (click)="setStatus('OVERDUE')"
           >
             Vencidos ({{ overdueLoansCount() }})
           </button>
@@ -137,7 +148,7 @@ export type SortOrder = 'asc' | 'desc';
             type="button"
             class="pill-btn"
             [class.active]="statusFilter() === 'RETURNED'"
-            (click)="statusFilter.set('RETURNED')"
+            (click)="setStatus('RETURNED')"
           >
             Devueltos ({{ returnedLoansCount() }})
           </button>
@@ -149,7 +160,7 @@ export type SortOrder = 'asc' | 'desc';
     <section class="loans-section" aria-labelledby="loans-heading">
       <h2 id="loans-heading" class="sr-only">Historial de préstamos</h2>
 
-      @if (loading()) {
+      @if (loading() && !result()) {
         <div class="card p-3">
           <div class="skeleton-stack">
             <app-skeleton height="2.2rem" />
@@ -158,8 +169,8 @@ export type SortOrder = 'asc' | 'desc';
             <app-skeleton height="2.2rem" />
           </div>
         </div>
-      } @else if (filteredLoans().length === 0) {
-        @if (loans().length === 0) {
+      } @else if (pageItems().length === 0) {
+        @if (totalLoansCount() === 0) {
           <app-empty-state
             icon="loans"
             title="Todavía no hay préstamos"
@@ -177,7 +188,8 @@ export type SortOrder = 'asc' | 'desc';
           />
         }
       } @else {
-        <div class="table-wrap">
+        <!-- Al cambiar de página se conserva la tabla atenuada: sin saltos ni parpadeos -->
+        <div class="table-wrap" [class.refreshing]="fetching()" [attr.aria-busy]="fetching()">
           <table class="loans-table">
             <caption class="sr-only">
               Lista de préstamos
@@ -219,7 +231,7 @@ export type SortOrder = 'asc' | 'desc';
               </tr>
             </thead>
             <tbody>
-              @for (l of filteredLoans(); track l.id) {
+              @for (l of pageItems(); track l.id) {
                 <tr [class.row-overdue]="l.status === 'OVERDUE'">
                   <td class="col-book">
                     <div class="loan-book-cell">
@@ -279,6 +291,18 @@ export type SortOrder = 'asc' | 'desc';
             </tbody>
           </table>
         </div>
+        @if (result(); as r) {
+          <app-paginator
+            label="Paginación del historial de préstamos"
+            [page]="r.page"
+            [size]="r.size"
+            [totalElements]="r.totalElements"
+            [totalPages]="r.totalPages"
+            [disabled]="fetching()"
+            (pageChange)="goToPage($event)"
+            (sizeChange)="changePageSize($event)"
+          />
+        }
       }
     </section>
 
@@ -377,6 +401,12 @@ export type SortOrder = 'asc' | 'desc';
     />
   `,
   styles: `
+    .table-wrap {
+      transition: opacity 0.2s ease;
+    }
+    .table-wrap.refreshing {
+      opacity: 0.55;
+    }
     /* ---- Tabla de préstamos adaptable (sin scroll horizontal) ---- */
     .loans-table td {
       white-space: normal;
@@ -574,7 +604,12 @@ export class LoansPage implements OnInit {
   private readonly notify = inject(NotifyService);
   private readonly fb = inject(FormBuilder);
 
-  readonly loans = signal<Loan[]>([]);
+  /** Página actual del historial (la devuelve el servidor ya filtrada y ordenada). */
+  readonly result = signal<PageResponse<Loan> | null>(null);
+  /** Contadores por estado para pestañas e indicadores. */
+  readonly summary = signal<LoanSummary | null>(null);
+  /** Hay una página en camino (la tabla anterior se muestra atenuada). */
+  readonly fetching = signal(false);
   readonly members = signal<Member[]>([]);
   readonly availableBooks = signal<Book[]>([]);
   readonly loading = signal(true);
@@ -591,6 +626,13 @@ export class LoansPage implements OnInit {
   readonly statusFilter = signal<LoanFilterStatus>('ALL');
   readonly sortField = signal<LoanSortField>('dueDate');
   readonly sortOrder = signal<SortOrder>('asc');
+  readonly page = signal(0);
+  readonly pageSize = signal(10);
+  /** Texto de búsqueda ya aplicado (se actualiza 300 ms después de dejar de escribir). */
+  private readonly appliedSearch = signal('');
+  /** Se incrementa para volver a pedir la página actual (tras prestar o devolver). */
+  private readonly refreshTick = signal(0);
+  private searchTimer?: ReturnType<typeof setTimeout>;
 
   /** Opciones del menú para préstamos activos o vencidos (referencia estable para OnPush). */
   readonly activeLoanActions: ActionMenuItem[] = [
@@ -608,54 +650,48 @@ export class LoansPage implements OnInit {
   });
 
   // Computed counters
-  readonly activeLoansCount = computed(
-    () => this.loans().filter((l) => l.status === 'ACTIVE').length,
-  );
+  readonly totalLoansCount = computed(() => this.summary()?.total ?? 0);
+  readonly activeLoansCount = computed(() => this.summary()?.active ?? 0);
+  readonly overdueLoansCount = computed(() => this.summary()?.overdue ?? 0);
+  readonly returnedLoansCount = computed(() => this.summary()?.returned ?? 0);
 
-  readonly overdueLoansCount = computed(
-    () => this.loans().filter((l) => l.status === 'OVERDUE').length,
-  );
+  readonly pageItems = computed(() => this.result()?.content ?? []);
 
-  readonly returnedLoansCount = computed(
-    () => this.loans().filter((l) => l.status === 'RETURNED').length,
-  );
+  /** Consulta completa al servidor: cualquier cambio de filtro, orden o página la vuelve a lanzar. */
+  private readonly request = computed(() => ({
+    params: {
+      status: this.statusFilter(),
+      q: this.appliedSearch(),
+      sort: this.sortField(),
+      direction: this.sortOrder(),
+      page: this.page(),
+      size: this.pageSize(),
+    } satisfies LoanQueryParams,
+    tick: this.refreshTick(),
+  }));
 
-  readonly filteredLoans = computed(() => {
-    let result = [...this.loans()];
-    const query = this.searchTerm().trim().toLowerCase();
-    const status = this.statusFilter();
-    const field = this.sortField();
-    const order = this.sortOrder();
-
-    if (status !== 'ALL') {
-      result = result.filter((l) => l.status === status);
-    }
-
-    if (query) {
-      result = result.filter(
-        (l) =>
-          l.bookTitle.toLowerCase().includes(query) || l.memberName.toLowerCase().includes(query),
-      );
-    }
-
-    result.sort((a, b) => {
-      let comp = 0;
-      if (field === 'bookTitle') {
-        comp = a.bookTitle.localeCompare(b.bookTitle);
-      } else if (field === 'memberName') {
-        comp = a.memberName.localeCompare(b.memberName);
-      } else if (field === 'loanDate') {
-        comp = a.loanDate.localeCompare(b.loanDate);
-      } else if (field === 'dueDate') {
-        comp = a.dueDate.localeCompare(b.dueDate);
-      } else if (field === 'status') {
-        comp = a.status.localeCompare(b.status);
-      }
-      return order === 'asc' ? comp : -comp;
-    });
-
-    return result;
-  });
+  constructor() {
+    // switchMap cancela la petición anterior si el usuario cambia de filtro o página antes de
+    // que llegue la respuesta, así nunca se pinta una página "vieja" encima de la nueva.
+    toObservable(this.request)
+      .pipe(
+        tap(() => this.fetching.set(true)),
+        switchMap(({ params }) => this.api.searchLoans(params).pipe(catchError(() => of(null)))),
+        takeUntilDestroyed(),
+      )
+      .subscribe((page) => {
+        this.fetching.set(false);
+        this.loading.set(false);
+        if (!page) return;
+        // Si la página quedó vacía (p. ej. se devolvió el último préstamo de la última página),
+        // se retrocede a la última página que sí existe.
+        if (page.content.length === 0 && page.page > 0 && page.totalPages > 0) {
+          this.page.set(page.totalPages - 1);
+          return;
+        }
+        this.result.set(page);
+      });
+  }
 
   ngOnInit(): void {
     this.load();
@@ -690,7 +726,36 @@ export class LoansPage implements OnInit {
 
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
-    this.searchTerm.set(target?.value ?? '');
+    const value = target?.value ?? '';
+    this.searchTerm.set(value);
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => {
+      this.appliedSearch.set(value.trim());
+      this.page.set(0);
+    }, 300);
+  }
+
+  clearSearch(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTerm.set('');
+    this.appliedSearch.set('');
+    this.page.set(0);
+  }
+
+  /** Cambiar de filtro vuelve a la primera página. */
+  setStatus(status: LoanFilterStatus): void {
+    this.statusFilter.set(status);
+    this.page.set(0);
+  }
+
+  goToPage(page: number): void {
+    this.page.set(page);
+    document.querySelector('.loans-section')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }
+
+  changePageSize(size: number): void {
+    this.pageSize.set(size);
+    this.page.set(0);
   }
 
   toggleSort(field: LoanSortField): void {
@@ -700,6 +765,7 @@ export class LoansPage implements OnInit {
       this.sortField.set(field);
       this.sortOrder.set('asc');
     }
+    this.page.set(0);
   }
 
   getSortIcon(field: LoanSortField): 'sort' | 'arrow-up' | 'arrow-down' {
@@ -708,19 +774,24 @@ export class LoansPage implements OnInit {
   }
 
   resetFilters(): void {
+    clearTimeout(this.searchTimer);
     this.searchTerm.set('');
+    this.appliedSearch.set('');
     this.statusFilter.set('ALL');
+    this.page.set(0);
   }
 
   load(): void {
     this.loading.set(true);
+    // La página del historial la pide la consulta reactiva; aquí se recargan los datos auxiliares.
+    this.refreshTick.update((n) => n + 1);
     forkJoin({
-      loans: this.api.listLoans(),
+      summary: this.api.loanSummary(),
       members: this.api.listMembers(),
       books: this.api.listBooks(),
     }).subscribe({
-      next: ({ loans, members, books }) => {
-        this.loans.set(loans);
+      next: ({ summary, members, books }) => {
+        this.summary.set(summary);
         this.members.set(members);
         this.availableBooks.set(books.filter((b) => b.available));
         this.loading.set(false);
