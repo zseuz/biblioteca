@@ -1,0 +1,16 @@
+# Blueprint de Render: crea el servicio del backend a partir de backend/Dockerfile.
+# Render → New → Blueprint → elegir este repositorio y la rama deploy/vercel-render.
+services:
+  - type: web
+    name: biblioteca-api
+    runtime: docker
+    branch: deploy/vercel-render
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      # Dirección del frontend en Vercel, p. ej. https://biblioteca.vercel.app
+      # (se pide al crear el servicio; varias se separan con comas).
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
