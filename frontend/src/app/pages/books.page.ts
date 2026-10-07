@@ -12,6 +12,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
 import { mergeGenres } from '../core/genres';
+import { formatIsoDate } from '../core/renewal';
 import { Book, BookInput, Loan, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
@@ -190,7 +191,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
           </div>
         </div>
       } @else if (filteredBooks().length === 0) {
-        @if (books().length === 0) {
+        @if (books().length === 0 && !query().trim()) {
           <app-empty-state
             icon="book"
             title="No hay libros registrados"
@@ -1196,7 +1197,7 @@ export class BooksPage implements OnInit {
     this.quickLoanSubmitting.set(true);
     this.api.lend(book.id, memberId).subscribe({
       next: (loan) => {
-        this.notify.ok(`Préstamo registrado exitosamente, vence el ${loan.dueDate}`);
+        this.notify.ok(`Préstamo registrado exitosamente, vence el ${formatIsoDate(loan.dueDate)}`);
         this.quickLoanModalOpen.set(false);
         this.quickLoanBook.set(null);
         this.quickLoanSubmitting.set(false);

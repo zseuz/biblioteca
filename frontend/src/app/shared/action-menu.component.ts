@@ -113,6 +113,13 @@ const GAP = 6;
         color 0.15s ease,
         border-color 0.15s ease;
     }
+    /* En pantallas táctiles el botón mide 44 px (tamaño cómodo para el dedo). */
+    @media (pointer: coarse) {
+      .kebab-btn {
+        width: 44px;
+        height: 44px;
+      }
+    }
     .kebab-btn:hover,
     .kebab-btn.open {
       background: var(--surface-subtle);
