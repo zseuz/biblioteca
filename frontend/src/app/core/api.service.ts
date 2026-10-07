@@ -7,6 +7,7 @@ import {
   BookDuplicateCheck,
   BookInput,
   Loan,
+  LoanRenewalHistory,
   LoanQueryParams,
   LoanSummary,
   Member,
@@ -95,8 +96,16 @@ export class ApiService {
     return this.http.get<Loan[]>(`${API_URL}/loans/active`, { params });
   }
   /** Renueva un préstamo en plazo: vuelve a tener 14 días desde hoy. */
-  renewLoan(id: number): Observable<Loan> {
-    return this.http.post<Loan>(`${API_URL}/loans/${id}/renew`, {});
+  /**
+   * Renueva un préstamo en plazo: vuelve a tener 14 días desde hoy.
+   * Con {@code silent} el error no se muestra como aviso global (lo presenta quien llama).
+   */
+  renewLoan(id: number, silent = false): Observable<Loan> {
+    return this.http.post<Loan>(`${API_URL}/loans/${id}/renew`, {}, silent ? { context: silentErrors() } : {});
+  }
+  /** Préstamo inicial y cada renovación con su fecha y hora. */
+  renewalHistory(id: number): Observable<LoanRenewalHistory> {
+    return this.http.get<LoanRenewalHistory>(`${API_URL}/loans/${id}/renewals`);
   }
   giveBack(id: number): Observable<Loan> {
     return this.http.post<Loan>(`${API_URL}/loans/${id}/return`, {});

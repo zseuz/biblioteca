@@ -18,6 +18,7 @@ export type IconName =
   | 'moon'
   | 'filter'
   | 'refresh'
+  | 'history'
   | 'grid'
   | 'table'
   | 'return'
@@ -142,6 +143,11 @@ export type IconName =
           <path d="M3 3v5h5" />
           <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
           <path d="M16 21h5v-5" />
+        }
+        @case ('history') {
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M12 7v5l4 2" />
         }
         @case ('grid') {
           <rect x="3" y="3" width="7" height="7" />
