@@ -214,7 +214,7 @@ Pulsa `Ctrl + C` en cada una de las dos terminales.
 | La API responde | Abrir http://localhost:8080/api/books | Lista de libros en JSON |
 | Documentación de la API | Abrir http://localhost:8080/swagger-ui.html | Swagger UI con todos los endpoints |
 | El frontend se conecta | Abrir http://localhost:4200 | Catálogo con 8 libros |
-| Registros de prueba | Filtro **Agotados** en Libros y **Vencidos** en Préstamos; buscar «Fahrenheit» en Préstamos | «1984» agotado, «Rayuela» vencido y «Fahrenheit 451» renovado 3 veces |
+| Registros de prueba | Filtro **Agotados** en Libros y **Vencidos** en Préstamos; buscar «Fahrenheit» y «Cumbres» en Préstamos | «1984» agotado, «Rayuela» vencido, «Fahrenheit 451» renovado 3 veces y «Cumbres borrascosas» listo para renovar |
 
 Si la web muestra *"No se pudo conectar con el servidor"*, el backend no está arrancado (revisa la Terminal 1).
 
@@ -226,13 +226,14 @@ En el **primer arranque** (base de datos vacía) se cargan automáticamente:
 
 - **6 libros, 3 usuarios** y **seis meses de historial** de préstamos (devueltos, activos y uno vencido), para que las gráficas muestren tendencias desde el inicio. Las fechas son relativas al día actual.
 
-En **cada arranque**, de forma idempotente (nunca se duplican), se garantizan estos **registros de prueba** (los dos primeros del usuario *Usuario de Prueba*, `prueba@biblioteca.test`; el tercero de *Lector Renovaciones*, `renovaciones@biblioteca.test`):
+En **cada arranque**, de forma idempotente (nunca se duplican), se garantizan estos **registros de prueba** (los dos primeros del usuario *Usuario de Prueba*, `prueba@biblioteca.test`; el tercero de *Lector Renovaciones*, `renovaciones@biblioteca.test`, y el cuarto de *Lector para Renovar*, `renovable@biblioteca.test`):
 
 | Registro | Situación | Dónde verlo |
 |---|---|---|
 | **«1984»** de George Orwell | Su único ejemplar está prestado → **Agotado** | Libros → filtro *Agotados* |
 | **«Rayuela»** de Julio Cortázar | Prestado hace 20 días con plazo de 14 → **Vencido** | Préstamos → filtro *Vencidos* |
 | **«Fahrenheit 451»** de Ray Bradbury | Prestado hace 29 días y **renovado 3 veces** (hace 20, 11 y 2 días, cada vez en el primer día permitido) → sigue **Activo** | Préstamos → *Renovado 3 veces* abre el historial |
+| **«Cumbres borrascosas»** de Emily Brontë | En plazo, prestado hace 11 días: le quedan **3 días**, así que **ya se puede renovar** (los demás préstamos activos todavía no) | Préstamos → ⋮ → *Renovar* |
 
 Los datos se guardan en `backend/data/` (no se sube a Git). **Para reiniciar la base de datos:** detén el backend, borra la carpeta `backend/data/` y vuelve a arrancarlo.
 
