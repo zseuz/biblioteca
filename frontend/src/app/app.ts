@@ -4,13 +4,20 @@ import { NotifyService } from './core/notify.service';
 import { ThemeService } from './core/theme.service';
 import { IconComponent } from './shared/icon.component';
 
+/**
+ * Componente raíz: el «marco» que se ve en todas las pantallas. Contiene la cabecera con el
+ * menú y el botón de tema, el aviso flotante (toast), el pie de página y <router-outlet>, donde
+ * el enrutador coloca la pantalla activa.
+ */
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <!-- Enlace invisible hasta recibir el foco: permite a quien usa teclado saltar el menú. -->
     <a class="skip-link" href="#contenido">Saltar al contenido</a>
 
+    <!-- Cabecera: logo, menú principal (routerLinkActive marca la pantalla actual) y botón de tema. -->
     <header class="app-header">
       <div class="header-inner">
         <div class="brand-group">
@@ -52,6 +59,7 @@ import { IconComponent } from './shared/icon.component';
       </div>
     </header>
 
+    <!-- Aviso flotante (toast): muestra lo que haya en NotifyService.notice; aria-live lo lee en voz alta. -->
     <div class="toast-viewport" aria-live="polite" role="status">
       @if (notify.notice(); as n) {
         <div
@@ -77,10 +85,12 @@ import { IconComponent } from './shared/icon.component';
       }
     </div>
 
+    <!-- Contenido: aquí el enrutador pinta Libros, Usuarios, Préstamos o Estadísticas. -->
     <main id="contenido" class="app-main" tabindex="-1">
       <router-outlet />
     </main>
 
+    <!-- Pie de página (siempre abajo, aunque la pantalla tenga poco contenido). -->
     <footer class="app-footer">
       <div class="footer-inner">
         <span>Sistema de Gestión de Biblioteca</span>
@@ -376,6 +386,8 @@ import { IconComponent } from './shared/icon.component';
   `,
 })
 export class App {
+  /** Servicio de avisos: la plantilla lee notify.notice() para mostrar el toast. */
   protected readonly notify = inject(NotifyService);
+  /** Servicio de tema claro/oscuro (botón de la cabecera). */
   protected readonly themeService = inject(ThemeService);
 }

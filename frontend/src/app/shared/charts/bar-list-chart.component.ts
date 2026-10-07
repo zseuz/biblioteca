@@ -13,6 +13,7 @@ import { ChartDatum, ChartUnit, percentOf, withUnit } from './chart.models';
  */
 @Component({
   selector: 'app-bar-list-chart',
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ol class="bars" [attr.aria-label]="ariaLabel()">
@@ -112,14 +113,18 @@ import { ChartDatum, ChartUnit, percentOf, withUnit } from './chart.models';
   `,
 })
 export class BarListChartComponent {
+  /** Filas a dibujar (etiqueta y valor), ya ordenadas por el servidor. */
   readonly data = input.required<ChartDatum[]>();
+  /** Unidad de los valores, para las etiquetas y los lectores de pantalla. */
   readonly unit = input<ChartUnit>({ one: 'elemento', many: 'elementos' });
   /** Muestra la posición (1, 2, 3...) delante de cada etiqueta. */
   readonly ranked = input<boolean>(false);
   /** Muestra el porcentaje sobre el total de la serie. */
   readonly showShare = input<boolean>(false);
+  /** Descripción de la gráfica para lectores de pantalla. */
   readonly ariaLabel = input<string>('Gráfica de barras');
 
+  /** Cada fila con el ancho de su barra relativo al valor máximo (la mayor ocupa el 100 %). */
   protected readonly rows = computed(() => {
     const data = this.data();
     const max = Math.max(...data.map((d) => d.count), 1);

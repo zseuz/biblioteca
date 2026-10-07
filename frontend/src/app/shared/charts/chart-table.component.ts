@@ -7,6 +7,7 @@ import { ChartDatum, percentOf } from './chart.models';
  */
 @Component({
   selector: 'app-chart-table',
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <table class="chart-table">
@@ -56,15 +57,21 @@ import { ChartDatum, percentOf } from './chart.models';
   `,
 })
 export class ChartTableComponent {
+  /** Los mismos datos que la gráfica, mostrados como tabla (alternativa accesible). */
   readonly data = input.required<ChartDatum[]>();
+  /** Títulos de la tabla y de sus dos columnas. */
   readonly caption = input<string>('Datos de la gráfica');
   readonly labelHeader = input<string>('Categoría');
   readonly valueHeader = input<string>('Cantidad');
+  /** Añade una columna con el porcentaje de cada fila sobre el total. */
   readonly showShare = input<boolean>(false);
+  /** Función para mostrar la etiqueta, p. ej. «2026-10» → «Octubre 2026». */
   readonly formatLabel = input<(label: string) => string>((l) => l);
 
+  /** Suma de todos los valores (base de los porcentajes). */
   private readonly total = computed(() => this.data().reduce((sum, d) => sum + d.count, 0));
 
+  /** Porcentaje de una fila sobre el total. */
   protected share(count: number): number {
     return percentOf(count, this.total());
   }
