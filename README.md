@@ -702,7 +702,7 @@ flowchart LR
 
 ### 2. Frontend en Vercel
 
-1. Si la URL de Render **no** es `https://biblioteca-api.onrender.com`, cámbiala en `frontend/src/environments/environment.ts` y haz push a esta rama.
+1. Si la URL de Render **no** es `https://biblioteca-api-se8r.onrender.com` (la actual), cámbiala en `frontend/src/environments/environment.ts` y haz push a esta rama.
 2. Entra en [vercel.com](https://vercel.com) con tu cuenta de GitHub → **Add New → Project** → importa `zseuz/biblioteca`.
 3. En **Root Directory** elige `frontend`. El resto (instalación, build y carpeta de salida) ya está en `frontend/vercel.json`.
 4. En **Settings → Git → Production Branch** pon `deploy/vercel-render`, para que se publique esta rama y no `main`.
