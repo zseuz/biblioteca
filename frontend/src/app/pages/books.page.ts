@@ -11,6 +11,7 @@ import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angu
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
+import { mergeGenres } from '../core/genres';
 import { Book, BookInput, Loan, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
@@ -395,12 +396,17 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
           <div class="form-row">
             <div class="form-group">
               <label for="genre">Género literario *</label>
-              <input
-                id="genre"
+              <app-combobox
+                inputId="genre"
                 formControlName="genre"
-                placeholder="Ej. Realismo mágico, Novela..."
-                [class.invalid]="invalid('genre')"
-                [attr.aria-invalid]="invalid('genre')"
+                [options]="genreOptions()"
+                [allowCustom]="true"
+                [maxlength]="80"
+                icon="book"
+                [invalid]="invalid('genre')"
+                placeholder="Elige un género o escribe uno nuevo..."
+                newOptionLabel="Añadir género"
+                newOptionHint="Género nuevo"
               />
               @if (invalid('genre')) {
                 <p class="error"><app-icon name="alert" [size]="13" /> El género es obligatorio.</p>
@@ -857,6 +863,11 @@ export class BooksPage implements OnInit {
     const list = this.books().map((b) => b.genre);
     return Array.from(new Set(list)).filter(Boolean).sort();
   });
+
+  /** Géneros para el formulario: los sugeridos más los que ya tienen los libros del catálogo. */
+  readonly genreOptions = computed<ComboboxOption<string>[]>(() =>
+    mergeGenres(this.books().map((b) => b.genre)).map((g) => ({ value: g, label: g })),
+  );
 
   readonly totalBooksCount = computed(() => this.books().length);
 
