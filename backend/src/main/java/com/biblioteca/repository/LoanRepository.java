@@ -1,6 +1,7 @@
 package com.biblioteca.repository;
 
 import com.biblioteca.domain.Loan;
+import com.biblioteca.dto.MonthCount;
 import com.biblioteca.dto.StatEntry;
 import java.time.LocalDate;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface LoanRepository extends JpaRepository<Loan, Long> {
 
@@ -38,6 +40,20 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 
     /** Total de préstamos activos vencidos a la fecha {@code date}. */
     long countByReturnDateIsNullAndDueDateBefore(LocalDate date);
+
+    /** Total de préstamos ya devueltos. */
+    long countByReturnDateIsNotNull();
+
+    /**
+     * Préstamos iniciados por mes desde {@code from} (inclusive). Los meses sin préstamos no
+     * aparecen; {@code StatsService} los rellena con cero para que la serie sea continua.
+     */
+    @Query("""
+            select new com.biblioteca.dto.MonthCount(year(l.loanDate), month(l.loanDate), count(l))
+            from Loan l where l.loanDate >= :from
+            group by year(l.loanDate), month(l.loanDate)
+            """)
+    List<MonthCount> countPerMonthSince(@Param("from") LocalDate from);
 
     // Estadísticas: agregación y límite resueltos en la BD; solo viajan las filas necesarias.
     // El segundo criterio de orden hace el resultado determinista cuando hay empates.
