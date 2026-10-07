@@ -23,6 +23,9 @@ export interface ComboboxOption<T = number> {
   description?: string;
 }
 
+/** Opción tal como se muestra: puede ser la opción "nueva" que ofrece el modo {@code allowCustom}. */
+type ViewOption<T> = ComboboxOption<T> & { isNew?: boolean };
+
 let nextId = 0;
 
 /** Normaliza para comparar sin distinguir mayúsculas ni tildes ("Pérez" coincide con "perez"). */
@@ -38,6 +41,9 @@ function normalize(text: string): string {
  *   <li>Al escribir se filtran por texto principal y secundario, sin importar tildes.</li>
  *   <li>Teclado: ↑/↓ para moverse, Enter para elegir, Escape para cerrar.</li>
  *   <li>Si se sale del campo sin elegir, vuelve a mostrar la opción seleccionada.</li>
+ *   <li>Con {@code allowCustom}, además de elegir se puede <b>escribir un valor que no está en la
+ *       lista</b>: aparece una fila «Añadir …» y el texto escrito pasa a ser el valor del control
+ *       (solo para opciones de tipo texto; las opciones son sugerencias).</li>
  * </ul>
  *
  * <p>Implementa {@link ControlValueAccessor}, así que se usa como cualquier control de
@@ -63,6 +69,7 @@ function normalize(text: string): string {
         autocomplete="off"
         [id]="inputId()"
         [placeholder]="placeholder()"
+        [attr.maxlength]="maxlength()"
         [value]="text()"
         [disabled]="disabled()"
         aria-autocomplete="list"
@@ -124,15 +131,17 @@ function normalize(text: string): string {
             (mouseenter)="activeIndex.set(i)"
             (click)="select(opt)"
           >
-            <span class="combo-avatar" aria-hidden="true">
-              @if (icon(); as iconName) {
+            <span class="combo-avatar" [class.new]="opt.isNew" aria-hidden="true">
+              @if (opt.isNew) {
+                <app-icon name="plus" [size]="15" />
+              } @else if (icon(); as iconName) {
                 <app-icon [name]="iconName" [size]="15" />
               } @else {
                 {{ initials(opt.label) }}
               }
             </span>
             <span class="combo-text">
-              <span class="combo-label">{{ opt.label }}</span>
+              <span class="combo-label">{{ opt.isNew ? newOptionLabel() + ' «' + opt.label + '»' : opt.label }}</span>
               @if (opt.description) {
                 <span class="combo-desc">{{ opt.description }}</span>
               }
@@ -237,6 +246,10 @@ function normalize(text: string): string {
       font-size: 0.72rem;
       font-weight: 700;
     }
+    .combo-avatar.new {
+      background: var(--success-light);
+      color: var(--success);
+    }
     .combo-text {
       display: flex;
       flex-direction: column;
@@ -277,6 +290,17 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
   readonly inputId = input<string>(`combobox-${nextId++}`);
   /** Marca visual de error (el formulario decide cuándo mostrarla). */
   readonly invalid = input<boolean>(false);
+  /**
+   * Permite escribir un valor que no está en la lista (las opciones pasan a ser sugerencias).
+   * Pensado para opciones de tipo texto: el valor del control es el texto escrito.
+   */
+  readonly allowCustom = input<boolean>(false);
+  /** Longitud máxima del texto escrito (atributo {@code maxlength} del campo). */
+  readonly maxlength = input<number | null>(null);
+  /** Texto de la fila que ofrece usar lo escrito, p. ej. "Añadir género" → «Añadir género «Terror»». */
+  readonly newOptionLabel = input<string>('Añadir');
+  /** Texto secundario de esa fila. */
+  readonly newOptionHint = input<string>('Valor nuevo');
 
   protected readonly listId = `combobox-list-${nextId++}`;
   protected readonly open = signal(false);
@@ -300,12 +324,24 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
   private onChange: (value: T | null) => void = () => {};
   private onTouched: () => void = () => {};
 
-  /** Opciones visibles: todas al abrir; filtradas en cuanto el usuario escribe. */
-  protected readonly filtered = computed(() => {
+  /**
+   * Opciones visibles: todas al abrir; filtradas en cuanto el usuario escribe. Con
+   * {@code allowCustom}, si lo escrito no coincide exactamente con ninguna opción, se añade al
+   * final la fila «Añadir …» (así Enter elige primero la mejor sugerencia).
+   */
+  protected readonly filtered = computed<ViewOption<T>[]>(() => {
     const options = this.options();
-    const query = normalize(this.text());
+    const raw = this.text().trim();
+    const query = normalize(raw);
     if (!this.filtering() || !query) return options;
-    return options.filter((o) => normalize(`${o.label} ${o.description ?? ''}`).includes(query));
+    const matches: ViewOption<T>[] = options.filter((o) =>
+      normalize(`${o.label} ${o.description ?? ''}`).includes(query),
+    );
+    const exact = options.some((o) => normalize(o.label) === query);
+    if (this.allowCustom() && !exact) {
+      matches.push({ value: raw as unknown as T, label: raw, description: this.newOptionHint(), isNew: true });
+    }
+    return matches;
   });
 
   constructor() {
@@ -382,8 +418,12 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
       this.updatePosition();
       this.open.set(true);
     }
-    // Si borra todo el texto, la selección deja de ser válida.
-    if (!this.text().trim() && this.value() !== null) {
+    if (this.allowCustom()) {
+      // El texto escrito es el valor (se recorta; vacío = sin valor).
+      const typed = this.text().trim();
+      this.commit(typed ? (typed as unknown as T) : this.emptyValue());
+    } else if (!this.text().trim() && this.value() !== null) {
+      // Si borra todo el texto, la selección deja de ser válida.
       this.commit(null);
     }
   }
@@ -429,13 +469,14 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     this.onTouched();
   }
 
-  select(option: ComboboxOption<T>): void {
+  select(option: ViewOption<T>): void {
     this.commit(option.value);
+    this.text.set(option.label); // evita que hide() trate el texto a medias como valor nuevo
     this.hide();
   }
 
   clear(): void {
-    this.commit(null);
+    this.commit(this.emptyValue());
     this.text.set('');
     this.filtering.set(false);
     this.inputEl().nativeElement.focus();
@@ -459,7 +500,24 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
   private hide(): void {
     this.open.set(false);
     this.filtering.set(false);
+    if (this.allowCustom()) this.adoptTypedText();
     this.syncText(); // descarta texto a medias y muestra la opción seleccionada
+  }
+
+  /**
+   * Con {@code allowCustom}, al salir del campo el texto escrito queda como valor. Si coincide con
+   * una opción (sin distinguir mayúsculas ni tildes) se usa la grafía de esa opción.
+   */
+  private adoptTypedText(): void {
+    const typed = this.text().trim();
+    if (!typed) return;
+    const match = this.options().find((o) => normalize(o.label) === normalize(typed));
+    this.commit(match ? match.value : (typed as unknown as T));
+  }
+
+  /** Valor "vacío": texto vacío con {@code allowCustom}, {@code null} en el modo normal. */
+  private emptyValue(): T | null {
+    return this.allowCustom() ? ('' as unknown as T) : null;
   }
 
   private commit(value: T | null): void {
@@ -468,10 +526,11 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
     this.onChange(value);
   }
 
-  /** Muestra en el campo la etiqueta de la opción seleccionada (o vacío). */
+  /** Muestra en el campo la etiqueta de la opción seleccionada (o el valor escrito, o vacío). */
   private syncText(): void {
     const selected = this.options().find((o) => o.value === this.value());
-    this.text.set(selected?.label ?? '');
+    const custom = this.allowCustom() && this.value() != null ? String(this.value()) : '';
+    this.text.set(selected?.label ?? custom);
   }
 
   /** Coloca la lista bajo el campo; si no cabe, encima. */
