@@ -2,6 +2,19 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { IconComponent } from './icon.component';
 import { ModalComponent } from './modal.component';
 
+/**
+ * Diálogo de confirmación.
+ *
+ * <ul>
+ *   <li><b>Carga sin saltos:</b> el botón conserva su ancho (el texto se oculta y el spinner se
+ *       superpone) y el spinner solo aparece si la espera supera ~150 ms, así una respuesta
+ *       rápida del servidor no produce un parpadeo.</li>
+ *   <li><b>Errores en contexto:</b> si la acción falla, el motivo se muestra dentro del propio
+ *       diálogo en lugar de un aviso detrás de la ventana.</li>
+ *   <li><b>Modo informativo:</b> con {@code showConfirm=false} solo queda un botón
+ *       ({@code cancelText}, p. ej. "Entendido") para explicar por qué algo no se puede hacer.</li>
+ * </ul>
+ */
 @Component({
   selector: 'app-confirm-dialog',
   imports: [ModalComponent, IconComponent],
@@ -13,6 +26,12 @@ import { ModalComponent } from './modal.component';
           <app-icon [name]="variant() === 'danger' ? 'alert' : 'info'" [size]="28" />
         </div>
         <p class="confirm-message">{{ message() }}</p>
+        @if (error()) {
+          <p class="confirm-error" role="alert">
+            <app-icon name="alert" [size]="15" />
+            <span>{{ error() }}</span>
+          </p>
+        }
       </div>
 
       <div modal-actions class="confirm-actions">
@@ -22,21 +41,25 @@ import { ModalComponent } from './modal.component';
           [disabled]="loading()"
           (click)="cancel.emit()"
         >
-          Cancelar
+          {{ cancelText() }}
         </button>
-        <button
-          type="button"
-          class="btn"
-          [class.btn-danger]="variant() === 'danger'"
-          [class.btn-primary]="variant() !== 'danger'"
-          [disabled]="loading()"
-          (click)="confirm.emit()"
-        >
-          @if (loading()) {
-            <span class="spinner-sm"></span>
-          }
-          {{ confirmText() }}
-        </button>
+        @if (showConfirm()) {
+          <button
+            type="button"
+            class="btn confirm-btn"
+            [class.btn-danger]="variant() === 'danger'"
+            [class.btn-primary]="variant() !== 'danger'"
+            [class.is-loading]="loading()"
+            [disabled]="loading()"
+            [attr.aria-busy]="loading()"
+            (click)="confirm.emit()"
+          >
+            <span class="btn-label">{{ confirmText() }}</span>
+            @if (loading()) {
+              <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
+            }
+          </button>
+        }
       </div>
     </app-modal>
   `,
@@ -73,11 +96,60 @@ import { ModalComponent } from './modal.component';
       line-height: 1.5;
     }
 
+    .confirm-error {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--danger-border);
+      border-radius: var(--radius-sm);
+      background: var(--danger-light);
+      color: var(--danger);
+      font-size: 0.85rem;
+      text-align: left;
+      animation: errorIn 0.2s ease-out;
+    }
+
     .confirm-actions {
       display: flex;
       width: 100%;
       justify-content: flex-end;
       gap: 0.5rem;
+    }
+
+    /* Botón con carga: mismo ancho siempre, spinner superpuesto y con retardo. */
+    .confirm-btn {
+      position: relative;
+    }
+    .confirm-btn.is-loading .btn-label {
+      visibility: hidden;
+    }
+    .btn-spinner {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      opacity: 0;
+      animation:
+        spin 0.6s linear infinite,
+        spinnerIn 0.15s ease-out 0.15s forwards;
+    }
+
+    @keyframes spinnerIn {
+      to {
+        opacity: 1;
+      }
+    }
+    @keyframes errorIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
   `,
 })
@@ -86,8 +158,13 @@ export class ConfirmDialogComponent {
   readonly title = input.required<string>();
   readonly message = input.required<string>();
   readonly confirmText = input<string>('Confirmar');
+  readonly cancelText = input<string>('Cancelar');
+  /** {@code false} = diálogo solo informativo (un único botón, {@code cancelText}). */
+  readonly showConfirm = input<boolean>(true);
   readonly variant = input<'danger' | 'primary'>('danger');
   readonly loading = input<boolean>(false);
+  /** Motivo por el que falló la acción; se muestra dentro del diálogo. */
+  readonly error = input<string | null>(null);
 
   readonly confirm = output<void>();
   readonly cancel = output<void>();

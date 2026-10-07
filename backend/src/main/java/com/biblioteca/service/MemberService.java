@@ -1,6 +1,7 @@
 package com.biblioteca.service;
 
 import com.biblioteca.domain.Member;
+import com.biblioteca.dto.MemberLoanCount;
 import com.biblioteca.dto.MemberRequest;
 import com.biblioteca.dto.MemberResponse;
 import com.biblioteca.exception.BusinessRuleException;
@@ -8,6 +9,9 @@ import com.biblioteca.exception.NotFoundException;
 import com.biblioteca.repository.LoanRepository;
 import com.biblioteca.repository.MemberRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
@@ -36,10 +40,20 @@ public class MemberService {
         this.loans = loans;
     }
 
-    /** Todos los usuarios ordenados alfabéticamente. */
+    /**
+     * Todos los usuarios ordenados alfabéticamente, con sus contadores de préstamos.
+     * Son dos consultas en total (usuarios + agregación), sin importar cuántos usuarios haya.
+     */
     @Transactional(readOnly = true)
     public List<MemberResponse> list() {
-        return members.findAll(Sort.by("name")).stream().map(MemberResponse::from).toList();
+        Map<Long, MemberLoanCount> counts = loans.loanCountsByMember().stream()
+                .collect(Collectors.toMap(MemberLoanCount::memberId, Function.identity()));
+        return members.findAll(Sort.by("name")).stream()
+                .map(m -> {
+                    MemberLoanCount c = counts.get(m.getId());
+                    return c == null ? MemberResponse.from(m) : MemberResponse.from(m, c.active(), c.total());
+                })
+                .toList();
     }
 
     /**
@@ -68,7 +82,7 @@ public class MemberService {
             throw new BusinessRuleException(DUPLICATE_EMAIL);
         }
         member.update(r.name(), r.email());
-        return MemberResponse.from(member);
+        return MemberResponse.from(member, loans.countByMemberIdAndReturnDateIsNull(id), loans.countByMemberId(id));
     }
 
     /**

@@ -1,9 +1,12 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
+import { SILENT_ERRORS } from './error.interceptor';
 import { Book, BookInput, Loan, Member, MemberInput, Stats } from './models';
 
 export const API_URL = 'http://localhost:8080/api';
+
+const silentErrors = () => new HttpContext().set(SILENT_ERRORS, true);
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -20,8 +23,9 @@ export class ApiService {
   updateBook(id: number, book: BookInput): Observable<Book> {
     return this.http.put<Book>(`${API_URL}/books/${id}`, book);
   }
+  /** El error (p. ej. 409 por historial) lo muestra el diálogo de confirmación, no el aviso global. */
   deleteBook(id: number): Observable<void> {
-    return this.http.delete<void>(`${API_URL}/books/${id}`);
+    return this.http.delete<void>(`${API_URL}/books/${id}`, { context: silentErrors() });
   }
 
   // Usuarios
@@ -34,8 +38,9 @@ export class ApiService {
   updateMember(id: number, member: MemberInput): Observable<Member> {
     return this.http.put<Member>(`${API_URL}/members/${id}`, member);
   }
+  /** El error (p. ej. 409 por historial) lo muestra el diálogo de confirmación, no el aviso global. */
   deleteMember(id: number): Observable<void> {
-    return this.http.delete<void>(`${API_URL}/members/${id}`);
+    return this.http.delete<void>(`${API_URL}/members/${id}`, { context: silentErrors() });
   }
 
   // Préstamos

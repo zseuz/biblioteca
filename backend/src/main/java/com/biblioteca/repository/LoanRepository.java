@@ -1,6 +1,7 @@
 package com.biblioteca.repository;
 
 import com.biblioteca.domain.Loan;
+import com.biblioteca.dto.MemberLoanCount;
 import com.biblioteca.dto.MonthCount;
 import com.biblioteca.dto.StatEntry;
 import java.time.LocalDate;
@@ -31,6 +32,20 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 
     /** ¿Tiene el usuario historial de préstamos? (impide su eliminación) */
     boolean existsByMemberId(Long memberId);
+
+    /** Préstamos registrados de un usuario (histórico). */
+    long countByMemberId(Long memberId);
+
+    /**
+     * Contadores de préstamos de todos los usuarios con al menos uno, en una sola consulta
+     * (evita N+1 al listar). {@code count(case ...)} solo cuenta los préstamos sin devolver.
+     */
+    @Query("""
+            select new com.biblioteca.dto.MemberLoanCount(
+                l.member.id, count(l), count(case when l.returnDate is null then 1 end))
+            from Loan l group by l.member.id
+            """)
+    List<MemberLoanCount> loanCountsByMember();
 
     /** ¿Tiene el libro historial de préstamos? (impide su eliminación) */
     boolean existsByBookId(Long bookId);
