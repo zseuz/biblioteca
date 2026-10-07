@@ -122,6 +122,25 @@ class LoanSearchIntegrationTest {
     }
 
     @Test
+    void searchIgnoresAccentsInBothDirections() throws Exception {
+        // Bruno Díaz tiene 6 préstamos: se encuentra con o sin tilde y en mayúsculas.
+        mvc.perform(get("/api/loans").param("q", "diaz")).andExpect(jsonPath("$.totalElements", is(6)));
+        mvc.perform(get("/api/loans").param("q", "DÍAZ")).andExpect(jsonPath("$.totalElements", is(6)));
+        mvc.perform(get("/api/loans").param("q", "díaz")).andExpect(jsonPath("$.totalElements", is(6)));
+        mvc.perform(get("/api/loans").param("q", "dias")).andExpect(jsonPath("$.totalElements", is(0)));
+    }
+
+    @Test
+    void statsCountOnlyInTimeLoansAsActiveLikeTheLoanSummary() throws Exception {
+        // Mismos números que /api/loans/summary: 5 en plazo, 3 vencidos y 4 devueltos.
+        mvc.perform(get("/api/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeLoans", is(5)))
+                .andExpect(jsonPath("$.overdueLoans", is(3)))
+                .andExpect(jsonPath("$.returnedLoans", is(4)));
+    }
+
+    @Test
     void wildcardCharactersAreSearchedLiterally() throws Exception {
         mvc.perform(get("/api/loans").param("q", "%")).andExpect(jsonPath("$.totalElements", is(0)));
         mvc.perform(get("/api/loans").param("q", "_")).andExpect(jsonPath("$.totalElements", is(0)));
