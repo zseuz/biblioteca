@@ -73,6 +73,12 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
       </div>
     } @else if (stats(); as s) {
       <div class="dashboard" [class.refreshing]="loading()" [attr.aria-busy]="loading()">
+        @if (s.totalBooks === 0 && s.totalMembers === 0 && s.activeLoans + s.overdueLoans + s.returnedLoans === 0) {
+          <p class="no-data-banner" role="status">
+            <app-icon name="info" [size]="16" />
+            Aún no hay datos registrados. Agrega libros y usuarios y registra préstamos para ver las estadísticas.
+          </p>
+        }
         <!-- Tarjetas KPI principales -->
         <div class="kpi-grid">
           <div class="kpi-card card">
@@ -117,8 +123,8 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
             <ng-container
               *ngTemplateOutlet="header; context: { id: 'months', icon: 'chart', title: 'Préstamos por mes', sub: 'Últimos 6 meses' }"
             />
-            @if (s.loansByMonth.length === 0) {
-              <app-empty-state icon="chart" title="Sin datos de tendencia" message="Todavía no hay préstamos registrados por mes." />
+            @if (monthsTotal(s) === 0) {
+              <app-empty-state icon="chart" title="Sin préstamos recientes" message="No hay préstamos registrados en los últimos 6 meses." />
             } @else if (isTable('months')) {
               <app-chart-table
                 [data]="s.loansByMonth"
@@ -142,7 +148,9 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
             <ng-container
               *ngTemplateOutlet="header; context: { id: 'status', icon: 'loans', title: 'Estado de los préstamos', sub: 'Histórico' }"
             />
-            @if (isTable('status')) {
+            @if (s.activeLoans + s.overdueLoans + s.returnedLoans === 0) {
+              <app-empty-state icon="loans" title="Sin préstamos" message="Aún no se ha registrado ningún préstamo." />
+            } @else if (isTable('status')) {
               <app-chart-table
                 [data]="statusTable()"
                 caption="Préstamos por estado"
@@ -240,6 +248,22 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
     </ng-template>
   `,
   styles: `
+    .no-data-banner {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin: 0 0 1rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-subtle);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    .no-data-banner app-icon {
+      flex-shrink: 0;
+      color: var(--primary);
+    }
     .spinning {
       animation: spin 0.8s linear infinite;
     }
@@ -454,6 +478,11 @@ export class StatsPage implements OnInit {
   );
 
   /** Resumen textual de la tendencia para lectores de pantalla. */
+  /** Préstamos de los últimos meses en total (0 = no hay actividad que dibujar). */
+  protected monthsTotal(s: Stats): number {
+    return s.loansByMonth.reduce((sum, m) => sum + m.count, 0);
+  }
+
   protected readonly monthsSummary = computed(() => {
     const months = this.stats()?.loansByMonth ?? [];
     if (!months.length) return 'Sin datos';

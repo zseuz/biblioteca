@@ -267,4 +267,25 @@ describe('MembersPage', () => {
     });
   });
 
+
+  it('si el servidor no responde, avisa del error en lugar de decir que no hay usuarios', async () => {
+    const fixture = TestBed.createComponent(MembersPage);
+    fixture.detectChanges();
+    http.expectOne(`${API_URL}/members`).error(new ProgressEvent('error'));
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('No se pudieron cargar los usuarios');
+    expect(text).not.toContain('No hay usuarios registrados');
+  });
+
+  it('sin usuarios registrados lo informa e invita a agregar el primero', async () => {
+    const fixture = TestBed.createComponent(MembersPage);
+    fixture.detectChanges();
+    http.expectOne(`${API_URL}/members`).flush([]);
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No hay usuarios registrados');
+  });
+
 });

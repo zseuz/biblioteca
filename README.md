@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-174%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-182%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -465,6 +465,8 @@ flowchart TD
 
 ## Guía de uso por pantalla
 
+**Sin datos o sin conexión.** Si una pantalla no tiene datos, lo indica (por ejemplo «No hay libros registrados» o «Todavía no hay préstamos») con un botón para agregar el primero; Estadísticas avisa en el panel y en cada gráfica. Si el servidor no responde, la pantalla muestra «No se pudieron cargar…» con un botón **Reintentar**, en lugar de dar a entender que no hay datos.
+
 ### Libros
 
 - **Nuevo libro:** botón superior derecho. Todos los campos son obligatorios, con un mínimo y un máximo de caracteres (ver [límites de los formularios](#límites-de-los-formularios)) y entre 1 y 1000 ejemplares. Título y autor muestran un contador (p. ej. *900/200* en rojo) y cada error dice exactamente qué falla: vacío, demasiado corto o demasiado largo.
@@ -483,7 +485,7 @@ flowchart TD
 
 ### Préstamos
 
-- **Registrar préstamo:** el usuario y el libro se eligen con un **buscador**: al hacer clic muestra todas las opciones y al escribir filtra sin importar mayúsculas ni tildes. Los usuarios se buscan por nombre o correo; los libros, por **título o autor**, y solo aparecen los que tienen ejemplares disponibles (con cuántos quedan).
+- **Registrar préstamo:** el usuario y el libro se eligen con un **buscador**: al hacer clic muestra todas las opciones y al escribir filtra sin importar mayúsculas ni tildes. Los usuarios se buscan por nombre o correo; los libros, por **título o autor**, y solo aparecen los que tienen ejemplares disponibles (con cuántos quedan). Si aún no hay usuarios o libros con ejemplares disponibles, el formulario lo indica con un enlace a esa pantalla y no deja prestar.
 - **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir; tampoco distingue tildes). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
 - **Orden:** por defecto se muestran primero los préstamos **más recientes** (fecha de préstamo descendente). Haz clic en la cabecera de una columna para ordenar por libro, usuario, fechas o estado; las fechas empiezan por la más reciente y un segundo clic invierte el orden.
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
@@ -636,7 +638,7 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
 | Backend (71 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, búsquedas sin tildes, errores 400 por parámetros ausentes, longitudes mínimas y máximas de cada campo, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (103 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones (obligatorio, mínimo y máximo de cada campo), menú de acciones, buscador (sin tildes), paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
+| Frontend (111 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones (obligatorio, mínimo y máximo de cada campo), pantallas sin datos o sin conexión, menú de acciones, buscador (sin tildes), paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
