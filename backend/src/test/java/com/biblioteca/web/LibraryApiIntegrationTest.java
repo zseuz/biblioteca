@@ -244,6 +244,30 @@ class LibraryApiIntegrationTest {
         mvc.perform(get("/api/books").param("q", "")).andExpect(jsonPath("$", hasSize(2)));
     }
 
+    @Test
+    void searchIgnoresAccents() throws Exception {
+        createBook("Cien años de soledad", "Gabriel García Márquez", "Realismo mágico", 1);
+        createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
+
+        mvc.perform(get("/api/books").param("q", "garcia")).andExpect(jsonPath("$", hasSize(1)));
+        mvc.perform(get("/api/books").param("q", "GARCÍA")).andExpect(jsonPath("$", hasSize(1)));
+        mvc.perform(get("/api/books").param("q", "anos")).andExpect(jsonPath("$", hasSize(1)));   // ñ ≈ n
+        mvc.perform(get("/api/books").param("q", "magico")).andExpect(jsonPath("$", hasSize(1))); // en el género
+        mvc.perform(get("/api/books").param("q", "ficcion")).andExpect(jsonPath("$[0].title", is("Dune")));
+        mvc.perform(get("/api/books").param("q", "50%")).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void missingRequiredParametersAreClientErrorsNotServerErrors() throws Exception {
+        mvc.perform(get("/api/loans/active").param("memberId", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Falta el parámetro obligatorio 'bookId'")));
+        mvc.perform(get("/api/loans/active")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/books/duplicates").param("title", "Dune"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Falta el parámetro obligatorio 'author'")));
+    }
+
     // ---- helpers -----------------------------------------------------------------------
 
     private long createBook(String title, String author, String genre, int copies) throws Exception {
