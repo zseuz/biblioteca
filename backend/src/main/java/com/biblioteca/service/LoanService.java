@@ -4,8 +4,11 @@ import com.biblioteca.config.LibraryProperties;
 import com.biblioteca.domain.Book;
 import com.biblioteca.domain.Loan;
 import com.biblioteca.domain.Member;
+import com.biblioteca.dto.LoanQuery;
 import com.biblioteca.dto.LoanRequest;
 import com.biblioteca.dto.LoanResponse;
+import com.biblioteca.dto.LoanSummary;
+import com.biblioteca.dto.PageResponse;
 import com.biblioteca.exception.BusinessRuleException;
 import com.biblioteca.exception.NotFoundException;
 import com.biblioteca.repository.BookRepository;
@@ -13,7 +16,6 @@ import com.biblioteca.repository.LoanRepository;
 import com.biblioteca.repository.MemberRepository;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -54,10 +56,20 @@ public class LoanService {
         this.clock = clock;
     }
 
+    /**
+     * Historial paginado con filtros, búsqueda y orden resueltos en la base de datos.
+     * Se usa una sola fecha para la consulta y el mapeo, así filtros y estados son coherentes.
+     */
     @Transactional(readOnly = true)
-    public List<LoanResponse> list() {
-        LocalDate today = today(); // una sola fecha para todo el listado: estados coherentes entre sí
-        return loans.findAllWithDetails().stream().map(l -> LoanResponse.from(l, today)).toList();
+    public PageResponse<LoanResponse> search(LoanQuery query) {
+        LocalDate today = today();
+        return loans.search(query, today).map(l -> LoanResponse.from(l, today));
+    }
+
+    /** Contadores por estado para las pestañas e indicadores. */
+    @Transactional(readOnly = true)
+    public LoanSummary summary() {
+        return loans.summary(today());
     }
 
     /**

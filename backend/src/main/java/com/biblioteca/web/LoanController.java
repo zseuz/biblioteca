@@ -1,22 +1,26 @@
 package com.biblioteca.web;
 
+import com.biblioteca.dto.LoanQuery;
 import com.biblioteca.dto.LoanRequest;
 import com.biblioteca.dto.LoanResponse;
+import com.biblioteca.dto.LoanSummary;
+import com.biblioteca.dto.PageResponse;
 import com.biblioteca.exception.ApiError;
 import com.biblioteca.service.LoanService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,11 +39,34 @@ public class LoanController {
         this.service = service;
     }
 
-    @Operation(summary = "Historial de préstamos", description = "Del más reciente al más antiguo. "
-            + "`status`: ACTIVE (en plazo), OVERDUE (vencido) o RETURNED (devuelto).")
+    @Operation(summary = "Historial de préstamos (paginado)",
+            description = "Filtros, búsqueda, orden y paginación se resuelven en la base de datos. "
+                    + "`status` de cada préstamo: ACTIVE (en plazo), OVERDUE (vencido) o RETURNED (devuelto). "
+                    + "`size` se acota entre 1 y 100.")
+    @ApiResponse(responseCode = "200", description = "Página de préstamos")
+    @ApiResponse(responseCode = "400", description = "Valor de status, sort o direction no admitido",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping
-    public List<LoanResponse> list() {
-        return service.list();
+    public PageResponse<LoanResponse> search(
+            @Parameter(description = "ALL, ACTIVE, OVERDUE o RETURNED", example = "OVERDUE")
+            @RequestParam(defaultValue = "ALL") String status,
+            @Parameter(description = "Texto en el título del libro o el nombre del usuario", example = "dune")
+            @RequestParam(required = false) String q,
+            @Parameter(description = "bookTitle, memberName, loanDate, dueDate o status", example = "dueDate")
+            @RequestParam(defaultValue = "dueDate") String sort,
+            @Parameter(description = "asc o desc", example = "asc")
+            @RequestParam(defaultValue = "asc") String direction,
+            @Parameter(description = "Página, empezando en 0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Elementos por página (1-100)")
+            @RequestParam(defaultValue = "" + LoanQuery.DEFAULT_SIZE) int size) {
+        return service.search(LoanQuery.fromParams(status, q, sort, direction, page, size));
+    }
+
+    @Operation(summary = "Contadores por estado",
+            description = "Total, activos (en plazo), vencidos y devueltos, en una sola consulta.")
+    @GetMapping("/summary")
+    public LoanSummary summary() {
+        return service.summary();
     }
 
     @Operation(summary = "Prestar un libro",
