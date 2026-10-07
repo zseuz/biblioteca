@@ -10,6 +10,14 @@ export interface Book {
 
 export type BookInput = Pick<Book, 'title' | 'author' | 'genre' | 'totalCopies'>;
 
+/** Resultado de comprobar si un libro ya existe antes de registrarlo. */
+export interface BookDuplicateCheck {
+  /** Mismo título, autor y género: se le pueden añadir ejemplares en vez de duplicarlo. */
+  sameBook: Book | null;
+  /** Mismo título y autor con otro género: se muestra la diferencia para confirmar. */
+  differentGenre: Book[];
+}
+
 export interface Member {
   id: number;
   name: string;

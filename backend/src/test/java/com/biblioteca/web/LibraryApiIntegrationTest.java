@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -99,6 +100,77 @@ class LibraryApiIntegrationTest {
         // No se bloquean: la interfaz pide confirmación, pero pueden ser nombres legítimos.
         createMember("Juan Pablo 2", "jp2@example.com");
         createMember("X", "x@example.com");
+    }
+
+    @Test
+    void sameTitleAuthorAndGenreCannotBeRegisteredTwice() throws Exception {
+        long id = createBook("Dune", "Frank Herbert", "Ciencia ficción", 2);
+
+        // Mayúsculas y espacios distintos siguen siendo el mismo libro.
+        mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"  dune \",\"author\":\"FRANK   herbert\",\"genre\":\"ciencia ficción\",\"totalCopies\":3}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("Añade ejemplares")));
+
+        mvc.perform(get("/api/books")).andExpect(jsonPath("$", hasSize(1)));
+        mvc.perform(get("/api/books/{id}", id)).andExpect(jsonPath("$.totalCopies", is(2)));
+    }
+
+    @Test
+    void duplicateCheckSeparatesSameBookFromDifferentGenre() throws Exception {
+        long novela = createBook("Rayuela", "Julio Cortázar", "Novela", 1);
+        long ficcion = createBook("Rayuela", "Julio Cortázar", "Ficción", 1);
+        createBook("Rayuela", "Otro Autor", "Novela", 1); // otro autor: no cuenta
+
+        mvc.perform(get("/api/books/duplicates")
+                        .param("title", "rayuela").param("author", "julio cortázar").param("genre", "NOVELA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sameBook.id", is((int) novela)))
+                .andExpect(jsonPath("$.differentGenre", hasSize(1)))
+                .andExpect(jsonPath("$.differentGenre[0].id", is((int) ficcion)));
+
+        mvc.perform(get("/api/books/duplicates")
+                        .param("title", "Rayuela").param("author", "Julio Cortázar").param("genre", "Ensayo"))
+                .andExpect(jsonPath("$.sameBook").doesNotExist())
+                .andExpect(jsonPath("$.differentGenre", hasSize(2)));
+    }
+
+    @Test
+    void sameTitleAndAuthorWithDifferentGenreIsAllowed() throws Exception {
+        createBook("Rayuela", "Julio Cortázar", "Novela", 1);
+        createBook("Rayuela", "Julio Cortázar", "Ficción", 1); // createBook exige 201
+    }
+
+    @Test
+    void addingCopiesIncreasesTotalAndAvailable() throws Exception {
+        long id = createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
+        long memberId = createMember("Ana", "ana@example.com");
+        lend(id, memberId).andExpect(status().isCreated()); // 1 prestado, 0 disponibles
+
+        mvc.perform(post("/api/books/{id}/copies", id).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCopies", is(4)))
+                .andExpect(jsonPath("$.availableCopies", is(3)));
+
+        mvc.perform(post("/api/books/{id}/copies", id).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.quantity").exists());
+        mvc.perform(post("/api/books/{id}/copies", 999).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void editingABookIntoAnExistingOneIsRejected() throws Exception {
+        createBook("Dune", "Frank Herbert", "Ciencia ficción", 1);
+        long other = createBook("Dune Messiah", "Frank Herbert", "Ciencia ficción", 1);
+
+        mvc.perform(put("/api/books/{id}", other).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"genre\":\"Ciencia ficción\",\"totalCopies\":1}"))
+                .andExpect(status().isConflict());
+        // Editarse a sí mismo con los mismos datos sí está permitido.
+        mvc.perform(put("/api/books/{id}", other).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Dune Messiah\",\"author\":\"Frank Herbert\",\"genre\":\"Ciencia ficción\",\"totalCopies\":2}"))
+                .andExpect(status().isOk());
     }
 
     @Test

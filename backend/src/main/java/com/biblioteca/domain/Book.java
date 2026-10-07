@@ -82,6 +82,29 @@ public class Book {
     }
 
     /**
+     * Incorpora nuevos ejemplares del mismo libro (p. ej. al intentar registrarlo de nuevo).
+     * Llegan disponibles, así que aumentan tanto el total como los disponibles.
+     *
+     * @throws BusinessRuleException si la cantidad no es positiva
+     */
+    public void addCopies(int quantity) {
+        if (quantity < 1) {
+            throw new BusinessRuleException("La cantidad a añadir debe ser al menos 1");
+        }
+        totalCopies += quantity;
+        availableCopies += quantity;
+    }
+
+    /**
+     * Forma canónica de título, autor y género: sin espacios al inicio o al final y con los
+     * espacios internos repetidos reducidos a uno. Se guarda así para que la detección de
+     * duplicados (que además ignora mayúsculas) sea fiable.
+     */
+    public static String normalize(String text) {
+        return text == null ? "" : text.trim().replaceAll("\\s+", " ");
+    }
+
+    /**
      * Actualiza los datos del libro conservando los ejemplares que están prestados.
      *
      * @throws BusinessRuleException si el nuevo total es menor que los ejemplares en préstamo
