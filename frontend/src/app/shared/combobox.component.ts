@@ -12,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { IconComponent } from './icon.component';
+import { IconComponent, IconName } from './icon.component';
 
 /** Opción de un {@link ComboboxComponent}. */
 export interface ComboboxOption<T = number> {
@@ -124,7 +124,13 @@ function normalize(text: string): string {
             (mouseenter)="activeIndex.set(i)"
             (click)="select(opt)"
           >
-            <span class="combo-avatar" aria-hidden="true">{{ initials(opt.label) }}</span>
+            <span class="combo-avatar" aria-hidden="true">
+              @if (icon(); as iconName) {
+                <app-icon [name]="iconName" [size]="15" />
+              } @else {
+                {{ initials(opt.label) }}
+              }
+            </span>
             <span class="combo-text">
               <span class="combo-label">{{ opt.label }}</span>
               @if (opt.description) {
@@ -265,6 +271,8 @@ export class ComboboxComponent<T = number> implements ControlValueAccessor {
   readonly options = input.required<ComboboxOption<T>[]>();
   readonly placeholder = input<string>('Escribe para buscar...');
   readonly emptyText = input<string>('Sin coincidencias');
+  /** Icono a mostrar en cada opción; si no se indica, se muestran las iniciales del texto. */
+  readonly icon = input<IconName | null>(null);
   /** Id del {@code <input>}, para asociarlo a un {@code <label for>}. */
   readonly inputId = input<string>(`combobox-${nextId++}`);
   /** Marca visual de error (el formulario decide cuándo mostrarla). */
