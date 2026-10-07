@@ -452,10 +452,11 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       [open]="deleteDialogOpen()"
       title="Eliminar libro"
       [message]="
-        '¿Estás seguro de que deseas eliminar «' +
+        '¿Estás seguro de que deseas eliminar ' +
         (bookToDelete()?.title ?? '') +
-        '»? Esta acción no se puede deshacer.'
+        '? Esta acción no se puede deshacer.'
       "
+      [emphasis]="bookToDelete()?.title ?? ''"
       confirmText="Eliminar"
       variant="danger"
       [loading]="deleting()"

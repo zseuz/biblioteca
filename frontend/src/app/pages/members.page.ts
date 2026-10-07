@@ -330,6 +330,7 @@ export type SortOrder = 'asc' | 'desc';
       [open]="deleteDialogOpen()"
       [title]="canDelete() ? 'Eliminar usuario' : 'No se puede eliminar'"
       [message]="deleteMessage()"
+      [emphasis]="memberToDelete()?.name ?? ''"
       confirmText="Eliminar"
       [cancelText]="canDelete() ? 'Cancelar' : 'Entendido'"
       [showConfirm]="canDelete()"
@@ -540,7 +541,7 @@ export class MembersPage implements OnInit {
     const m = this.memberToDelete();
     if (!m) return '';
     if (this.canDelete()) {
-      return `¿Seguro que deseas eliminar a «${m.name}»? Esta acción no se puede deshacer.`;
+      return `¿Seguro que deseas eliminar a ${m.name}? Esta acción no se puede deshacer.`;
     }
     const active = m.activeLoans ?? 0;
     const total = m.totalLoans ?? 0;
@@ -551,7 +552,7 @@ export class MembersPage implements OnInit {
           (total > active ? ` y ${loans(total)} en su historial` : '')
         : `tiene ${loans(total)} en su historial`;
     return (
-      `«${m.name}» ${situation}. Para conservar la trazabilidad, solo se pueden eliminar ` +
+      `${m.name} ${situation}. Para conservar la trazabilidad, solo se pueden eliminar ` +
       'usuarios sin préstamos registrados.'
     );
   });

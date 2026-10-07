@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { IconComponent } from './icon.component';
 import { ModalComponent } from './modal.component';
 
@@ -25,7 +25,8 @@ import { ModalComponent } from './modal.component';
         <div class="confirm-icon-wrap" [class.danger]="variant() === 'danger'">
           <app-icon [name]="variant() === 'danger' ? 'alert' : 'info'" [size]="28" />
         </div>
-        <p class="confirm-message">{{ message() }}</p>
+        <!-- Texto plano + <strong>: el nombre nunca se interpreta como HTML -->
+        <p class="confirm-message">{{ parts().before }}@if (parts().strong) {<strong>{{ parts().strong }}</strong>}{{ parts().after }}</p>
         @if (error()) {
           <p class="confirm-error" role="alert">
             <app-icon name="alert" [size]="15" />
@@ -89,6 +90,11 @@ import { ModalComponent } from './modal.component';
       color: var(--danger);
     }
 
+    .confirm-message strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+
     .confirm-message {
       margin: 0;
       color: var(--text-muted);
@@ -135,6 +141,11 @@ export class ConfirmDialogComponent {
   readonly open = input<boolean>(false);
   readonly title = input.required<string>();
   readonly message = input.required<string>();
+  /**
+   * Fragmento del mensaje que se muestra en negrita (p. ej. el nombre del libro o del usuario).
+   * Se resalta su primera aparición dentro de {@link message}.
+   */
+  readonly emphasis = input<string>('');
   readonly confirmText = input<string>('Confirmar');
   readonly cancelText = input<string>('Cancelar');
   /** {@code false} = diálogo solo informativo (un único botón, {@code cancelText}). */
@@ -143,6 +154,19 @@ export class ConfirmDialogComponent {
   readonly loading = input<boolean>(false);
   /** Motivo por el que falló la acción; se muestra dentro del diálogo. */
   readonly error = input<string | null>(null);
+
+  /** Divide el mensaje para pintar en negrita el fragmento indicado. */
+  protected readonly parts = computed(() => {
+    const message = this.message();
+    const strong = this.emphasis();
+    const index = strong ? message.indexOf(strong) : -1;
+    if (index < 0) return { before: message, strong: '', after: '' };
+    return {
+      before: message.slice(0, index),
+      strong,
+      after: message.slice(index + strong.length),
+    };
+  });
 
   readonly confirm = output<void>();
   readonly cancel = output<void>();
