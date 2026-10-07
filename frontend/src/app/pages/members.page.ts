@@ -23,9 +23,16 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { SkeletonComponent } from '../shared/skeleton.component';
 
+/** Columnas por las que se puede ordenar la lista. */
 export type MemberSortField = 'name' | 'email';
+/** Sentido del orden. */
 export type SortOrder = 'asc' | 'desc';
 
+/**
+ * Pantalla «Usuarios»: lista con búsqueda local (sin tildes), orden, vista de tabla o tarjetas,
+ * alta y edición con validación (avisos de nombre con números o muy corto, correo repetido
+ * marcado junto al campo) y borrado protegido (no se borra a quien tiene préstamos).
+ */
 @Component({
   selector: 'app-members-page',
   imports: [
@@ -37,6 +44,7 @@ export type SortOrder = 'asc' | 'desc';
     EmptyStateComponent,
     SkeletonComponent,
   ],
+  // OnPush: Angular solo vuelve a pintar esta pantalla cuando cambian sus signals o entradas.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Encabezado de página -->
@@ -64,6 +72,7 @@ export type SortOrder = 'asc' | 'desc';
       </div>
     </div>
 
+    <!-- Barra de herramientas: buscador, filtros y botones de vista/orden. -->
     <div class="toolbar card">
       <div class="toolbar-left">
         <div class="search-input-wrap">
@@ -520,17 +529,23 @@ export type SortOrder = 'asc' | 'desc';
   `,
 })
 export class MembersPage implements OnInit {
+  /** Servicios: API, avisos flotantes y constructor de formularios (nonNullable). */
   private readonly api = inject(ApiService);
   private readonly notify = inject(NotifyService);
   private readonly fb = inject(FormBuilder).nonNullable;
 
+  /** Usuarios recibidos del servidor (con sus contadores de préstamos). */
   readonly members = signal<Member[]>([]);
+  /** Cargando la lista. */
   readonly loading = signal(true);
+  /** Guardando un usuario. */
   readonly saving = signal(false);
+  /** Usuario que se edita; null = alta. */
   readonly editing = signal<Member | null>(null);
 
   // Modales
   readonly isModalOpen = signal(false);
+  /** Estado del diálogo de borrado. */
   readonly deleteDialogOpen = signal(false);
   readonly memberToDelete = signal<Member | null>(null);
   readonly deleting = signal(false);
@@ -543,6 +558,10 @@ export class MembersPage implements OnInit {
    */
   readonly canDelete = computed(() => (this.memberToDelete()?.totalLoans ?? 0) === 0);
 
+  /**
+   * Texto del diálogo de borrado: la pregunta de confirmación o, si tiene préstamos, la
+   * explicación de por qué no se puede borrar (con cuántos préstamos tiene).
+   */
   readonly deleteMessage = computed(() => {
     const m = this.memberToDelete();
     if (!m) return '';
@@ -565,6 +584,7 @@ export class MembersPage implements OnInit {
 
   // Búsqueda y Filtro
   readonly searchTerm = signal('');
+  /** Vista elegida y orden de la lista. */
   readonly viewMode = signal<'table' | 'grid'>('table');
   readonly sortField = signal<MemberSortField>('name');
   readonly sortOrder = signal<SortOrder>('asc');
@@ -575,8 +595,13 @@ export class MembersPage implements OnInit {
     { id: 'delete', label: 'Eliminar', icon: 'trash', danger: true },
   ];
 
+  /** Máximo de caracteres del nombre (para el contador y el atributo maxlength). */
   protected readonly nameMax = NAME_MAX;
 
+  /**
+   * Formulario de alta/edición. El nombre: obligatorio y máximo 100 (si es muy corto o tiene
+   * números solo se avisa). El correo: obligatorio, con formato válido y de 6 a 150 caracteres.
+   */
   readonly form = this.fb.group({
     name: ['', [Validators.required, notBlank, textLength(LIMITS.memberName.min, NAME_MAX)]],
     email: [
@@ -587,16 +612,20 @@ export class MembersPage implements OnInit {
 
   /** Valor del nombre como signal, para recalcular contador y avisos al escribir (OnPush). */
   private readonly nameValue = toSignal(this.form.controls.name.valueChanges, { initialValue: '' });
+  /** Caracteres del nombre para el contador «5/100». */
   protected readonly nameLength = computed(() => (this.nameValue() ?? '').length);
+  /** Avisos sobre el nombre (números, 1 o 2 caracteres); no impiden guardar. */
   protected readonly nameWarnings = computed(() => nameWarnings(this.nameValue()));
   /** Diálogo "¿El nombre es correcto?" previo a guardar cuando hay avisos. */
   readonly nameConfirmOpen = signal(false);
+  /** Texto del diálogo que pide confirmar un nombre con avisos. */
   protected readonly nameConfirmMessage = computed(
     () =>
       `Se va a registrar el nombre «${(this.nameValue() ?? '').trim()}». ` +
       `${this.nameWarnings().join(' ')} Confirma que es correcto o revísalo.`,
   );
 
+  /** Lista que se muestra: filtrada por la búsqueda (sin tildes) y ordenada. */
   readonly filteredMembers = computed(() => {
     let result = [...this.members()];
     const query = normalizeText(this.searchTerm());
@@ -619,20 +648,24 @@ export class MembersPage implements OnInit {
     return result;
   });
 
+  /** Al entrar en la pantalla: carga los usuarios. */
   ngOnInit(): void {
     this.load();
   }
 
+  /** Un campo muestra error si no es válido y ya se tocó o modificó. */
   invalid(name: keyof typeof this.form.controls): boolean {
     const c = this.form.controls[name];
     return c.invalid && (c.touched || c.dirty);
   }
 
+  /** Cada tecla en el buscador (la lista se filtra al instante en el navegador). */
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     this.searchTerm.set(target?.value ?? '');
   }
 
+  /** Clic en una cabecera: ordena por esa columna o invierte el sentido. */
   toggleSort(field: MemberSortField): void {
     if (this.sortField() === field) {
       this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
@@ -642,11 +675,13 @@ export class MembersPage implements OnInit {
     }
   }
 
+  /** Flecha de la cabecera según el orden actual. */
   getSortIcon(field: MemberSortField): 'sort' | 'arrow-up' | 'arrow-down' {
     if (this.sortField() !== field) return 'sort';
     return this.sortOrder() === 'asc' ? 'arrow-up' : 'arrow-down';
   }
 
+  /** Pide los usuarios al servidor. Si falla, loadError muestra el error en vez de «no hay usuarios». */
   load(): void {
     this.loading.set(true);
     this.api.listMembers().subscribe({
@@ -665,6 +700,7 @@ export class MembersPage implements OnInit {
   /** La última carga de usuarios falló (sin conexión con el servidor). */
   readonly loadError = signal(false);
 
+  /** Abre el formulario vacío y pone el foco en el nombre. */
   openCreate(): void {
     this.editing.set(null);
     this.form.reset({ name: '', email: '' });
@@ -672,6 +708,7 @@ export class MembersPage implements OnInit {
     setTimeout(() => document.getElementById('name')?.focus(), 50);
   }
 
+  /** Guardar: valida, y si el nombre tiene avisos pide confirmación antes de enviarlo. */
   save(): void {
     if (this.form.invalid) {
       this.isModalOpen.set(true);
@@ -711,6 +748,10 @@ export class MembersPage implements OnInit {
     return validationMessage('El correo', control.errors);
   }
 
+  /**
+   * Envía el alta o la edición. Si el correo ya existe (409), el error se coloca en el campo
+   * de correo y el formulario sigue abierto.
+   */
   private persist(): void {
     const value = this.form.getRawValue();
     const current = this.editing();
@@ -743,6 +784,7 @@ export class MembersPage implements OnInit {
     });
   }
 
+  /** Abre el formulario con los datos del usuario elegido. */
   edit(member: Member): void {
     this.editing.set(member);
     this.form.setValue({ name: member.name, email: member.email });
@@ -750,6 +792,7 @@ export class MembersPage implements OnInit {
     setTimeout(() => document.getElementById('name')?.focus(), 50);
   }
 
+  /** Cierra el formulario y lo deja limpio. */
   cancel(): void {
     this.isModalOpen.set(false);
     this.editing.set(null);
@@ -765,12 +808,14 @@ export class MembersPage implements OnInit {
     }
   }
 
+  /** Menú ⋮ → Eliminar: abre el diálogo (de confirmación o de explicación). */
   remove(member: Member): void {
     this.memberToDelete.set(member);
     this.deleteError.set(null);
     this.deleteDialogOpen.set(true);
   }
 
+  /** Borra el usuario (solo si no tiene préstamos). */
   confirmDelete(): void {
     const m = this.memberToDelete();
     if (!m || !this.canDelete()) return;
@@ -793,12 +838,14 @@ export class MembersPage implements OnInit {
     });
   }
 
+  /** Cierra el diálogo de borrado. */
   cancelDelete(): void {
     this.deleteDialogOpen.set(false);
     this.memberToDelete.set(null);
     this.deleteError.set(null);
   }
 
+  /** Iniciales para el avatar: «Ana Torres» → «AT». */
   getInitials(name: string): string {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);
@@ -806,6 +853,7 @@ export class MembersPage implements OnInit {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
+  /** Color del avatar: sale del nombre, así cada usuario tiene siempre el mismo color. */
   getAvatarBg(name: string): string {
     const colors = [
       '#4f46e5',

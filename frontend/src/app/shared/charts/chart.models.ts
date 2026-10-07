@@ -1,19 +1,24 @@
 /** Punto de datos genérico de las gráficas: una etiqueta y su valor. */
 export interface ChartDatum {
+  /** Qué representa el dato, p. ej. un mes o un libro. */
   label: string;
+  /** Valor del dato. */
   count: number;
 }
 
 /** Unidad para leer los valores en voz alta y en tooltips ("1 préstamo", "3 préstamos"). */
 export interface ChartUnit {
+  /** Palabra en singular y en plural: «préstamo» / «préstamos». */
   one: string;
   many: string;
 }
 
+/** Número con su unidad bien concordada: 1 → «1 préstamo», 3 → «3 préstamos». */
 export function withUnit(count: number, unit: ChartUnit): string {
   return `${count.toLocaleString('es')} ${count === 1 ? unit.one : unit.many}`;
 }
 
+/** Porcentaje entero de count sobre total (0 si el total es 0, para no dividir por cero). */
 export function percentOf(count: number, total: number): number {
   return total > 0 ? Math.round((count / total) * 100) : 0;
 }

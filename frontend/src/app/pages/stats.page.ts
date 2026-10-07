@@ -17,6 +17,7 @@ import { SkeletonComponent } from '../shared/skeleton.component';
 /** Identificadores de las tarjetas que pueden alternar entre gráfica y tabla. */
 type ChartId = 'months' | 'status' | 'books' | 'genres' | 'members';
 
+/** Unidad de todas las gráficas: «1 préstamo», «3 préstamos». */
 const LOANS: ChartUnit = { one: 'préstamo', many: 'préstamos' };
 
 /** "2026-10" -> Date del día 1 de ese mes (hora local, sin desfases de zona horaria). */
@@ -25,12 +26,18 @@ function monthDate(isoMonth: string): Date {
   return new Date(year, month - 1, 1);
 }
 
+/** Formateadores de fecha en español: mes corto («oct») para el eje y largo («octubre de 2026») para tooltips y tablas. */
 const shortMonth = new Intl.DateTimeFormat('es', { month: 'short' });
 const longMonth = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' });
 
 /** Mayúscula solo en la primera letra ("octubre de 2026" -> "Octubre de 2026"). */
 const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
+/**
+ * Pantalla «Estadísticas»: indicadores y cinco gráficas (préstamos por mes, estado, libros más
+ * prestados, géneros y usuarios más activos). Cada gráfica tiene un botón para verla como tabla.
+ * Todo llega en una sola petición a /api/stats.
+ */
 @Component({
   selector: 'app-stats-page',
   imports: [
@@ -43,6 +50,7 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
     StackedBarChartComponent,
     ChartTableComponent,
   ],
+  // OnPush: Angular solo vuelve a pintar esta pantalla cuando cambian sus signals o entradas.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Encabezado de página -->
@@ -443,13 +451,17 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
   `,
 })
 export class StatsPage implements OnInit {
+  /** Servicio de acceso a la API. */
   private readonly api = inject(ApiService);
 
+  /** Datos del panel (null hasta la primera respuesta o si falló la carga). */
   readonly stats = signal<Stats | null>(null);
+  /** Cargando (la primera vez muestra esqueletos; al actualizar, el panel se atenúa). */
   readonly loading = signal(true);
   /** Tarjetas que el usuario cambió a vista de tabla. */
   private readonly tableViews = signal<ReadonlySet<ChartId>>(new Set());
 
+  /** Unidad para las gráficas, expuesta a la plantilla. */
   protected readonly loansUnit = LOANS;
 
   // Formateadores como propiedades (referencias estables para los inputs OnPush).
@@ -459,8 +471,8 @@ export class StatsPage implements OnInit {
     capitalize(longMonth.format(monthDate(iso)));
 
   /**
-   * Estado de los préstamos como partes de un todo. "Activos" del API incluye los vencidos,
-   * así que aquí se separan para que los segmentos no se solapen.
+   * Estado de los préstamos como partes de un todo: devueltos, al día (en plazo) y vencidos. El
+   * API ya los cuenta por separado, así que los tres segmentos suman el total sin solaparse.
    * Colores: estado fijo (verde/rojo) acompañado siempre de icono y texto en la leyenda.
    */
   protected readonly statusSegments = computed<StackedSegment[]>(() => {
@@ -473,16 +485,17 @@ export class StatsPage implements OnInit {
     ];
   });
 
+  /** Los mismos segmentos de estado en formato tabla. */
   protected readonly statusTable = computed<ChartDatum[]>(() =>
     this.statusSegments().map((seg) => ({ label: seg.label, count: seg.count })),
   );
 
-  /** Resumen textual de la tendencia para lectores de pantalla. */
   /** Préstamos de los últimos meses en total (0 = no hay actividad que dibujar). */
   protected monthsTotal(s: Stats): number {
     return s.loansByMonth.reduce((sum, m) => sum + m.count, 0);
   }
 
+  /** Resumen textual de la tendencia para lectores de pantalla. */
   protected readonly monthsSummary = computed(() => {
     const months = this.stats()?.loansByMonth ?? [];
     if (!months.length) return 'Sin datos';
@@ -492,10 +505,12 @@ export class StatsPage implements OnInit {
       `${this.formatMonthLong(last.label)}: ${last.count}.`;
   });
 
+  /** Al entrar: carga las estadísticas. */
   ngOnInit(): void {
     this.load();
   }
 
+  /** Pide las estadísticas (también lo usan «Actualizar datos» y «Reintentar»). */
   load(): void {
     this.loading.set(true);
     this.api.stats().subscribe({
@@ -507,10 +522,12 @@ export class StatsPage implements OnInit {
     });
   }
 
+  /** ¿La tarjeta indicada se está viendo como tabla? */
   protected isTable(id: ChartId): boolean {
     return this.tableViews().has(id);
   }
 
+  /** Cambia una tarjeta entre gráfica y tabla (botones Gráfica/Tabla). */
   protected setView(id: ChartId, table: boolean): void {
     this.tableViews.update((views) => {
       const next = new Set(views);

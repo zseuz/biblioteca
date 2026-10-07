@@ -12,9 +12,16 @@ import {
 } from '@angular/core';
 import { IconComponent } from './icon.component';
 
+/**
+ * Ventana modal reutilizable (formularios y diálogos). Pinta el fondo oscuro, la cabecera con
+ * título y botón ×, el cuerpo con el contenido proyectado (<ng-content>) y un pie para los
+ * botones (los que lleven el atributo modal-actions). Se cierra con ×, con Escape o al hacer clic
+ * fuera, y en todos los casos emite {@code close}: quien la usa decide qué hacer.
+ */
 @Component({
   selector: 'app-modal',
   imports: [IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (open()) {
@@ -182,15 +189,22 @@ import { IconComponent } from './icon.component';
   `,
 })
 export class ModalComponent {
+  /** Si la ventana está abierta. La controla el componente padre. */
   readonly open = input<boolean>(false);
+  /** Título de la cabecera (también es el nombre accesible del diálogo). */
   readonly title = input.required<string>();
+  /** Texto opcional bajo el título. */
   readonly subtitle = input<string>('');
+  /** Ancho máximo: pequeño (confirmaciones), mediano o grande (formularios). */
   readonly size = input<'sm' | 'md' | 'lg'>('md');
+  /** Muestra el pie para los botones de acción. */
   readonly hasFooter = input<boolean>(true);
+  /** Se emite al pedir cerrar (×, Escape o clic fuera). */
   readonly close = output<void>();
 
   /** Id estable del título: debe ser el mismo en el h2 y en aria-labelledby del diálogo. */
   readonly titleId = `modal-title-${Math.random().toString(36).slice(2, 7)}`;
+  /** Referencia al cuadro del diálogo, para darle el foco al abrir. */
   readonly dialogEl = viewChild<ElementRef<HTMLElement>>('dialogEl');
 
   /**
@@ -214,6 +228,7 @@ export class ModalComponent {
     });
   }
 
+  /** Escape cierra solo la modal de arriba (la última abierta), nunca las de debajo. */
   @HostListener('window:keydown.escape')
   onEscape(): void {
     const stack = ModalComponent.openStack;
@@ -222,6 +237,7 @@ export class ModalComponent {
     }
   }
 
+  /** Clic en el fondo oscuro: cierra. Un clic dentro del cuadro no llega aquí como «fondo». */
   onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
       this.close.emit();
