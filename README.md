@@ -34,7 +34,8 @@
 12. [Pruebas automatizadas](#pruebas-automatizadas)
 13. [Estructura del proyecto](#estructura-del-proyecto)
 14. [Configuración](#configuración)
-15. [Solución de problemas](#solución-de-problemas)
+15. [Publicación en internet](#publicación-en-internet-rama-deployvercel-render)
+16. [Solución de problemas](#solución-de-problemas)
 
 ---
 
@@ -668,6 +669,46 @@ Ajustes principales en `backend/src/main/resources/application.properties`. Todo
 | `springdoc.swagger-ui.path` | `/swagger-ui.html` | `SPRINGDOC_SWAGGER_UI_PATH` | Ruta de la documentación interactiva |
 
 La URL de la API que usa el frontend está en `frontend/src/app/core/api.service.ts` (`API_URL`).
+
+---
+
+## Publicación en internet (rama `deploy/vercel-render`)
+
+> Esta sección solo existe en la rama **`deploy/vercel-render`**. La rama `main` es la versión para ejecutar en local y no cambia.
+
+```mermaid
+flowchart LR
+    U["Navegador"] --> V["Vercel<br/>frontend Angular (estático)"]
+    V -- "HTTPS /api" --> R["Render<br/>backend Spring Boot (Docker)"]
+    R --> H[("H2 dentro del contenedor<br/>se recrea en cada reinicio")]
+```
+
+| Parte | Plataforma | Archivo de configuración |
+|---|---|---|
+| Frontend | **Vercel** | `frontend/vercel.json` y `frontend/src/environments/environment.ts` |
+| Backend | **Render** (plan gratuito) | `render.yaml` y `backend/Dockerfile` |
+
+**Diferencias con la versión local:**
+
+- La URL de la API sale de `src/environments/`: `ng serve` usa `environment.development.ts` (localhost) y `ng build` usa `environment.ts` (Render).
+- En el plan gratuito de Render el disco no es persistente: la base H2 **se vuelve a crear en cada despliegue o reinicio**, con los datos de demostración y los registros de prueba. Además, el servicio se duerme tras unos 15 minutos sin uso; la primera petición después puede tardar entre 30 y 60 segundos.
+
+### 1. Backend en Render
+
+1. Entra en [render.com](https://render.com) con tu cuenta de GitHub.
+2. **New → Blueprint** y elige el repositorio `zseuz/biblioteca`, rama `deploy/vercel-render`. Render lee `render.yaml` y crea el servicio `biblioteca-api`.
+3. Cuando pida `CORS_ALLOWED_ORIGINS`, escribe la URL que tendrá el frontend en Vercel (por ejemplo `https://biblioteca.vercel.app`). Si aún no la conoces, pon cualquiera y cámbiala después en *Environment*.
+4. Al terminar, comprueba `https://<tu-servicio>.onrender.com/actuator/health` → `{"status":"UP"}`.
+
+### 2. Frontend en Vercel
+
+1. Si la URL de Render **no** es `https://biblioteca-api.onrender.com`, cámbiala en `frontend/src/environments/environment.ts` y haz push a esta rama.
+2. Entra en [vercel.com](https://vercel.com) con tu cuenta de GitHub → **Add New → Project** → importa `zseuz/biblioteca`.
+3. En **Root Directory** elige `frontend`. El resto (instalación, build y carpeta de salida) ya está en `frontend/vercel.json`.
+4. En **Settings → Git → Production Branch** pon `deploy/vercel-render`, para que se publique esta rama y no `main`.
+5. Despliega y abre la URL que te asigne Vercel. Si es distinta de la que pusiste en el paso 3 de Render, actualiza `CORS_ALLOWED_ORIGINS` en Render.
+
+Desde ese momento, cada push a `deploy/vercel-render` vuelve a publicar ambas partes. Para llevar a esta rama cambios nuevos de `main`: `git checkout deploy/vercel-render` y luego `git merge main`.
 
 ---
 
