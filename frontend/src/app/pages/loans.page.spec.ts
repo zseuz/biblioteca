@@ -255,6 +255,22 @@ describe('LoansPage', () => {
       expect(fixture.componentInstance.form.getRawValue()).toEqual({ memberId: '1', bookId: '1' });
     });
 
+    it('si el préstamo existente aún no se puede renovar, desactiva «Renovar existente» e indica desde cuándo', async () => {
+      const due = new Date();
+      due.setDate(due.getDate() + 9);
+      const from = new Date();
+      from.setDate(from.getDate() + 4);
+      const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      await requestSameBook([{ ...quijote, dueDate: iso(due), renewableFrom: iso(from) }]);
+
+      const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('app-loan-repeat-dialog .repeat-actions button'));
+      const renewButton = buttons.find((b) => b.textContent?.includes('Renovar existente'));
+      expect(renewButton?.disabled).toBe(true);
+      expect(buttons.find((b) => b.textContent?.includes('Prestar otro ejemplar'))?.disabled).toBe(false);
+      const [y, m, d] = iso(from).split('-');
+      expect(document.body.textContent).toContain(`podrá renovarse desde el ${d}/${m}/${y}`);
+    });
+
     it('puede renovar el préstamo existente en lugar de prestar otro', async () => {
       const fixture = await requestSameBook([quijote]);
 
@@ -304,6 +320,12 @@ describe('LoansPage', () => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
+    /** Fecha ISO de dentro de {@code days} días (negativo = pasado). */
+    const isoIn = (days: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
     const confirmButtons = () =>
       Array.from(document.querySelectorAll('.confirm-actions button')).map((b) => b.textContent?.trim());
 
@@ -331,21 +353,47 @@ describe('LoansPage', () => {
       expect(text).toContain('+6 días');
     });
 
-    it('si ya se renovó hoy, informa a qué hora y no permite renovar de nuevo', async () => {
+    it('si faltan más de 5 días, informa desde cuándo se podrá renovar y no llama al servidor', async () => {
+      const fixture = await create();
+      // Vence en 9 días: se podrá renovar dentro de 4 (cuando falten 5).
+      fixture.componentInstance.onAction('renew', { ...quijote, dueDate: isoIn(9), renewableFrom: isoIn(4) });
+      await fixture.whenStable();
+
+      const message = document.querySelector('.confirm-message')?.textContent ?? '';
+      const [y, m, d] = isoIn(4).split('-');
+      expect(message).toContain(`No es posible renovar el préstamo de El Quijote hasta el ${d}/${m}/${y}`);
+      expect(message).toContain('faltan 5 días o menos');
+      expect(confirmButtons()).toEqual(['Entendido']);
+      fixture.componentInstance.confirmRenew();
+      http.expectNone((r) => r.url.endsWith('/renew'));
+    });
+
+    it('cuando ya faltan 5 días o menos, permite renovar', async () => {
+      const fixture = await create();
+      fixture.componentInstance.onAction('renew', { ...quijote, dueDate: isoIn(5), renewableFrom: isoIn(0) });
+      await fixture.whenStable();
+
+      expect(document.querySelector('.confirm-message')?.textContent).toContain('¿Renovar el préstamo de');
+      expect(confirmButtons()).toEqual(['Cancelar', 'Renovar']);
+    });
+
+    it('si ya se renovó hoy, además indica a qué hora', async () => {
       const fixture = await create();
       const today = todayIso();
       fixture.componentInstance.onAction('renew', {
         ...quijote,
+        dueDate: isoIn(14),
         renewals: 1,
         lastRenewedOn: today,
         lastRenewedAt: `${today}T10:42:05`,
+        renewableFrom: isoIn(9),
       });
       await fixture.whenStable();
 
-      expect(document.querySelector('.confirm-message')?.textContent).toContain('ya se renovó hoy a las 10:42');
+      const message = document.querySelector('.confirm-message')?.textContent ?? '';
+      expect(message).toContain('Ya se renovó hoy a las 10:42');
+      expect(message).toContain('No es posible renovar');
       expect(confirmButtons()).toEqual(['Entendido']);
-      fixture.componentInstance.confirmRenew();
-      http.expectNone((r) => r.url.endsWith('/renew'));
     });
 
     it('si el servidor rechaza la renovación, el motivo aparece en el diálogo', async () => {

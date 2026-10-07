@@ -49,7 +49,7 @@ class LoanServiceTest {
         BookRepository books = mock(BookRepository.class);
         MemberRepository members = mock(MemberRepository.class);
         Clock clock = Clock.fixed(Instant.parse("2026-03-10T10:00:00Z"), ZoneOffset.UTC);
-        LibraryProperties props = new LibraryProperties(new LibraryProperties.Loans(DAYS, MAX_ACTIVE));
+        LibraryProperties props = new LibraryProperties(new LibraryProperties.Loans(DAYS, MAX_ACTIVE, 5));
         service = new LoanService(loans, books, members, props, clock);
 
         book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 1);
