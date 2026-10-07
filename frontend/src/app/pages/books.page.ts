@@ -8,7 +8,9 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
+import { messageFor } from '../core/error.interceptor';
 import { Book, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
@@ -446,6 +448,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       confirmText="Eliminar"
       variant="danger"
       [loading]="deleting()"
+      [error]="deleteError()"
       (confirm)="confirmDelete()"
       (cancel)="cancelDelete()"
     />
@@ -777,6 +780,8 @@ export class BooksPage implements OnInit {
   readonly deleteDialogOpen = signal(false);
   readonly bookToDelete = signal<Book | null>(null);
   readonly deleting = signal(false);
+  /** Motivo por el que el servidor rechazó la baja (p. ej. historial); se ve dentro del diálogo. */
+  readonly deleteError = signal<string | null>(null);
 
   // Filtros y Vista
   readonly genreFilter = signal<string>('all');
@@ -994,6 +999,7 @@ export class BooksPage implements OnInit {
 
   remove(book: Book): void {
     this.bookToDelete.set(book);
+    this.deleteError.set(null);
     this.deleteDialogOpen.set(true);
   }
 
@@ -1002,6 +1008,7 @@ export class BooksPage implements OnInit {
     if (!b) return;
 
     this.deleting.set(true);
+    this.deleteError.set(null);
     this.api.deleteBook(b.id).subscribe({
       next: () => {
         this.notify.ok('Libro eliminado');
@@ -1010,8 +1017,9 @@ export class BooksPage implements OnInit {
         this.deleting.set(false);
         this.load();
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
         this.deleting.set(false);
+        this.deleteError.set(messageFor(err));
       },
     });
   }
@@ -1019,6 +1027,7 @@ export class BooksPage implements OnInit {
   cancelDelete(): void {
     this.deleteDialogOpen.set(false);
     this.bookToDelete.set(null);
+    this.deleteError.set(null);
   }
 
   openQuickLoan(book: Book): void {

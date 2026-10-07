@@ -14,6 +14,10 @@ export interface Member {
   id: number;
   name: string;
   email: string;
+  /** Préstamos sin devolver. */
+  activeLoans?: number;
+  /** Préstamos registrados en total; si es > 0 el usuario no se puede eliminar. */
+  totalLoans?: number;
 }
 
 export type MemberInput = Pick<Member, 'name' | 'email'>;
