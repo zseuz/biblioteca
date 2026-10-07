@@ -99,11 +99,11 @@ export type BookDuplicate =
             class="btn btn-primary"
             [disabled]="busy()"
             (click)="dup.kind === 'same' ? addCopies.emit() : createAnyway.emit()"
-          >
+           [class.is-loading]="busy()" [attr.aria-busy]="busy()">
+            <span class="btn-label">{{ dup.kind === 'same' ? 'Añadir ' + copies(dup.draft.totalCopies) : 'Sí, es correcto: crear' }}</span>
             @if (busy()) {
-              <span class="spinner-sm"></span>
+              <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
             }
-            {{ dup.kind === 'same' ? 'Añadir ' + copies(dup.draft.totalCopies) : 'Sí, es correcto: crear' }}
           </button>
         </div>
       </app-modal>

@@ -55,11 +55,12 @@ export class ApiService {
   listMembers(): Observable<Member[]> {
     return this.http.get<Member[]>(`${API_URL}/members`);
   }
+  /** Los errores (p. ej. correo ya registrado) se muestran en el propio formulario. */
   createMember(member: MemberInput): Observable<Member> {
-    return this.http.post<Member>(`${API_URL}/members`, member);
+    return this.http.post<Member>(`${API_URL}/members`, member, { context: silentErrors() });
   }
   updateMember(id: number, member: MemberInput): Observable<Member> {
-    return this.http.put<Member>(`${API_URL}/members/${id}`, member);
+    return this.http.put<Member>(`${API_URL}/members/${id}`, member, { context: silentErrors() });
   }
   /** El error (p. ej. 409 por historial) lo muestra el diálogo de confirmación, no el aviso global. */
   deleteMember(id: number): Observable<void> {
