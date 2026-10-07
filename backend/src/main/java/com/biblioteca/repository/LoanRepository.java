@@ -30,6 +30,14 @@ public interface LoanRepository extends JpaRepository<Loan, Long>, LoanSearchRep
             """)
     LoanSummary summary(@Param("today") LocalDate today);
 
+    /** Préstamos sin devolver de un usuario para un libro concreto (aviso de préstamo repetido). */
+    @Query("""
+            select l from Loan l join fetch l.book join fetch l.member
+            where l.member.id = :memberId and l.book.id = :bookId and l.returnDate is null
+            order by l.loanDate, l.id
+            """)
+    List<Loan> findActiveByMemberAndBook(@Param("memberId") Long memberId, @Param("bookId") Long bookId);
+
     /** Un préstamo con sus relaciones ya cargadas, listo para mapearse a DTO. */
     @Query("select l from Loan l join fetch l.book join fetch l.member where l.id = :id")
     Optional<Loan> findByIdWithDetails(Long id);

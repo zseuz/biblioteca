@@ -22,6 +22,7 @@ import {
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
 import { PaginatorComponent } from '../shared/paginator.component';
+import { LoanRepeat, LoanRepeatDialogComponent } from './loan-repeat-dialog.component';
 import { ComboboxComponent, ComboboxOption } from '../shared/combobox.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
@@ -40,6 +41,7 @@ export type SortOrder = 'asc' | 'desc';
     IconComponent,
     ActionMenuComponent,
     PaginatorComponent,
+    LoanRepeatDialogComponent,
     ComboboxComponent,
     ModalComponent,
     ConfirmDialogComponent,
@@ -258,6 +260,11 @@ export type SortOrder = 'asc' | 'desc';
                           {{ getDaysRelativeText(l.dueDate, l.status) }}
                         </span>
                       }
+                      @if (l.renewals) {
+                        <span class="due-subtext" [title]="'Última renovación: ' + formatDate(l.lastRenewedOn ?? '')">
+                          Renovado {{ l.renewals === 1 ? '1 vez' : l.renewals + ' veces' }}
+                        </span>
+                      }
                     </div>
                   </td>
                   <td class="col-returned">
@@ -280,7 +287,7 @@ export type SortOrder = 'asc' | 'desc';
                   <td class="col-actions">
                     @if (l.status !== 'RETURNED') {
                       <app-action-menu
-                        [items]="activeLoanActions"
+                        [items]="l.status === 'ACTIVE' ? activeLoanActions : overdueLoanActions"
                         [label]="'Acciones para el préstamo de ' + l.bookTitle"
                         (selected)="onAction($event, l)"
                       />
@@ -377,6 +384,34 @@ export type SortOrder = 'asc' | 'desc';
         </button>
       </div>
     </app-modal>
+
+    <!-- Confirmación de renovación -->
+    <app-confirm-dialog
+      [open]="!!loanToRenew()"
+      title="Renovar préstamo"
+      [message]="
+        '¿Renovar el préstamo de ' +
+        (loanToRenew()?.bookTitle ?? '') +
+        ' a ' +
+        (loanToRenew()?.memberName ?? '') +
+        '? Vencerá 14 días después de hoy.'
+      "
+      [emphasis]="loanToRenew()?.bookTitle ?? ''"
+      confirmText="Renovar"
+      variant="primary"
+      [loading]="renewing()"
+      (confirm)="confirmRenew()"
+      (cancel)="loanToRenew.set(null)"
+    />
+
+    <!-- Aviso: el usuario ya tiene este libro sin devolver -->
+    <app-loan-repeat-dialog
+      [repeat]="repeat()"
+      [busy]="saving() || renewing()"
+      (lendAnyway)="confirmRepeatLend()"
+      (renew)="renewFromRepeat($event)"
+      (cancel)="repeat.set(null)"
+    />
 
     <!-- Modal Confirmación Devolución -->
     <app-confirm-dialog
@@ -632,8 +667,19 @@ export class LoansPage implements OnInit {
 
   /** Opciones del menú para préstamos activos o vencidos (referencia estable para OnPush). */
   readonly activeLoanActions: ActionMenuItem[] = [
+    { id: 'renew', label: 'Renovar (14 días desde hoy)', icon: 'refresh' },
     { id: 'return', label: 'Registrar devolución', icon: 'return' },
   ];
+  /** Un préstamo vencido no se renueva: solo se puede devolver. */
+  readonly overdueLoanActions: ActionMenuItem[] = [
+    { id: 'return', label: 'Registrar devolución', icon: 'return' },
+  ];
+
+  /** Préstamo que se va a renovar (diálogo de confirmación). */
+  readonly loanToRenew = signal<Loan | null>(null);
+  readonly renewing = signal(false);
+  /** Aviso de préstamo repetido (el usuario ya tiene ese libro sin devolver). */
+  readonly repeat = signal<LoanRepeat | null>(null);
 
   /** Usuarios como opciones del buscador (el valor es el id en texto, igual que el formulario). */
   readonly memberOptions = computed<ComboboxOption<string>[]>(() =>
@@ -824,9 +870,77 @@ export class LoansPage implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { memberId, bookId } = this.form.getRawValue();
+    const memberId = Number(this.form.getRawValue().memberId);
+    const bookId = Number(this.form.getRawValue().bookId);
+    // Antes de prestar se comprueba si el usuario ya tiene ese libro sin devolver.
     this.saving.set(true);
-    this.api.lend(Number(bookId), Number(memberId)).subscribe({
+    this.api.activeLoansFor(memberId, bookId).subscribe({
+      next: (existing) => {
+        this.saving.set(false);
+        if (existing.length === 0) {
+          this.doLend(bookId, memberId);
+          return;
+        }
+        this.repeat.set({
+          memberName: this.members().find((m) => m.id === memberId)?.name ?? existing[0].memberName,
+          bookTitle: existing[0].bookTitle,
+          existing,
+        });
+      },
+      error: () => this.saving.set(false),
+    });
+  }
+
+  /** El usuario confirma que quiere otro préstamo del mismo libro. */
+  confirmRepeatLend(): void {
+    const memberId = Number(this.form.getRawValue().memberId);
+    const bookId = Number(this.form.getRawValue().bookId);
+    this.repeat.set(null);
+    this.doLend(bookId, memberId);
+  }
+
+  /** En lugar de prestar otro, renueva el préstamo que ya tenía. */
+  renewFromRepeat(loan: Loan): void {
+    this.renewing.set(true);
+    this.api.renewLoan(loan.id).subscribe({
+      next: (renewed) => {
+        this.renewing.set(false);
+        this.repeat.set(null);
+        this.closeModal();
+        this.notifyRenewed(renewed);
+        this.load();
+      },
+      error: () => this.renewing.set(false),
+    });
+  }
+
+  /** Abre la confirmación de renovación desde el menú ⋮. */
+  promptRenew(loan: Loan): void {
+    this.loanToRenew.set(loan);
+  }
+
+  confirmRenew(): void {
+    const loan = this.loanToRenew();
+    if (!loan) return;
+    this.renewing.set(true);
+    this.api.renewLoan(loan.id).subscribe({
+      next: (renewed) => {
+        this.renewing.set(false);
+        this.loanToRenew.set(null);
+        this.notifyRenewed(renewed);
+        this.load();
+      },
+      error: () => this.renewing.set(false),
+    });
+  }
+
+  private notifyRenewed(loan: Loan): void {
+    this.notify.ok(`Préstamo de «${loan.bookTitle}» renovado: ahora vence el ${this.formatDate(loan.dueDate)}`);
+  }
+
+  private doLend(bookId: number, memberId: number): void {
+    this.saving.set(true);
+    this.api.lend(bookId, memberId).subscribe({
       next: (loan) => {
         this.notify.ok(`Préstamo registrado, vence el ${loan.dueDate}`);
         this.closeModal();
@@ -841,6 +955,8 @@ export class LoansPage implements OnInit {
   onAction(action: string, loan: Loan): void {
     if (action === 'return') {
       this.promptReturn(loan);
+    } else if (action === 'renew') {
+      this.promptRenew(loan);
     }
   }
 
