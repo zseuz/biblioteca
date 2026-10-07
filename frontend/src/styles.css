@@ -505,9 +505,42 @@ button,
   gap: 0.45rem;
   line-height: 1.25;
   text-decoration: none;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Solo colores y sombra: animar "all" hacía que el botón se estirara al mostrar el spinner. */
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
   user-select: none;
   white-space: nowrap;
+}
+
+/*
+ * Botón en carga: conserva su ancho (el texto queda invisible y el spinner se superpone) y el
+ * spinner aparece tras 150 ms, así una respuesta rápida del servidor no provoca parpadeos.
+ * Uso: <button class="btn" [class.is-loading]="saving()"><span class="btn-label">Guardar</span>
+ *      @if (saving()) { <span class="spinner-sm btn-spinner"></span> }</button>
+ */
+.btn.is-loading {
+  position: relative;
+}
+.btn.is-loading > .btn-label {
+  visibility: hidden;
+}
+.btn > .btn-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  opacity: 0;
+  animation:
+    spin 0.6s linear infinite,
+    btn-spinner-in 0.15s ease-out 0.15s forwards;
+}
+@keyframes btn-spinner-in {
+  to {
+    opacity: 1;
+  }
 }
 
 button:hover,

@@ -288,7 +288,14 @@ export type SortOrder = 'asc' | 'desc';
               [attr.aria-invalid]="invalid('email')"
             />
             @if (invalid('email')) {
-              <p class="error"><app-icon name="alert" [size]="13" /> Ingresa un correo válido.</p>
+              <p class="error" role="alert">
+                <app-icon name="alert" [size]="13" />
+                {{
+                  form.controls.email.hasError('taken')
+                    ? 'Ya existe un usuario con ese correo. Usa otro o busca al usuario en la lista.'
+                    : 'Ingresa un correo válido.'
+                }}
+              </p>
             }
           </div>
         </div>
@@ -298,11 +305,11 @@ export type SortOrder = 'asc' | 'desc';
         <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
           Cancelar
         </button>
-        <button type="submit" form="member-form" class="btn btn-primary" [disabled]="saving()">
+        <button type="submit" form="member-form" class="btn btn-primary" [disabled]="saving()" [class.is-loading]="saving()" [attr.aria-busy]="saving()">
+          <span class="btn-label">{{ editing() ? 'Guardar cambios' : 'Agregar usuario' }}</span>
           @if (saving()) {
-            <span class="spinner-sm"></span>
+            <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
           }
-          {{ editing() ? 'Guardar cambios' : 'Agregar usuario' }}
         </button>
       </div>
     </app-modal>
@@ -696,9 +703,19 @@ export class MembersPage implements OnInit {
         this.saving.set(false);
         this.load();
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
         this.nameConfirmOpen.set(false);
         this.saving.set(false);
+        if (err.status === 409 && /correo/i.test(messageFor(err))) {
+          // Error en contexto: el campo se marca y recibe el foco. Al editarlo, los validadores
+          // vuelven a ejecutarse y el error desaparece solo.
+          const email = this.form.controls.email;
+          email.setErrors({ ...(email.errors ?? {}), taken: true });
+          email.markAsTouched();
+          setTimeout(() => document.getElementById('email')?.focus());
+        } else {
+          this.notify.error(messageFor(err));
+        }
       },
     });
   }
