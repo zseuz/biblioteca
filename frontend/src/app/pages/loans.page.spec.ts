@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { API_URL } from '../core/api.service';
+import { NotifyService } from '../core/notify.service';
 import { Loan, PageResponse } from '../core/models';
 import { LoansPage } from './loans.page';
 
@@ -187,10 +188,17 @@ describe('LoansPage', () => {
     expect(fixture.componentInstance.form.invalid).toBe(true);
   });
 
-  it('registra el préstamo y recarga la página actual y los contadores', async () => {
+  const isActiveCheck = (r: { url: string }) => r.url === `${API_URL}/loans/active`;
+
+  it('registra el préstamo (tras comprobar que no lo tiene ya) y recarga la página', async () => {
     const fixture = await create();
     fixture.componentInstance.form.setValue({ memberId: '1', bookId: '1' });
     fixture.componentInstance.lend();
+
+    const check = http.expectOne(isActiveCheck);
+    expect(check.request.params.get('memberId')).toBe('1');
+    expect(check.request.params.get('bookId')).toBe('1');
+    check.flush([]);
 
     const req = http.expectOne((r) => r.method === 'POST' && r.url === `${API_URL}/loans`);
     expect(req.request.body).toEqual({ bookId: 1, memberId: 1 });
@@ -198,5 +206,75 @@ describe('LoansPage', () => {
 
     flushAuxiliary();
     (await nextSearch(fixture)).flush(page([quijote, { ...quijote, id: 2 }]));
+  });
+
+  describe('préstamo repetido', () => {
+    async function requestSameBook(existing: Loan[]) {
+      const fixture = await create();
+      fixture.componentInstance.openCreateModal();
+      fixture.componentInstance.form.setValue({ memberId: '1', bookId: '1' });
+      fixture.componentInstance.lend();
+      http.expectOne(isActiveCheck).flush(existing);
+      await fixture.whenStable();
+      return fixture;
+    }
+
+    it('avisa desde cuándo lo tiene y, al confirmar, registra otro préstamo', async () => {
+      const fixture = await requestSameBook([quijote]);
+      const text = document.body.textContent ?? '';
+      expect(text).toContain('Este usuario ya tiene el libro');
+      expect(text).toContain('desde el');
+      expect(text).toContain('01/10/2026'); // fecha del préstamo existente
+      http.expectNone((r) => r.method === 'POST'); // aún no se presta
+
+      fixture.componentInstance.confirmRepeatLend();
+      http.expectOne((r) => r.method === 'POST' && r.url === `${API_URL}/loans`).flush({ ...quijote, id: 2 });
+      flushAuxiliary();
+      (await nextSearch(fixture)).flush(page([quijote]));
+      expect(fixture.componentInstance.repeat()).toBeNull();
+    });
+
+    it('puede renovar el préstamo existente en lugar de prestar otro', async () => {
+      const fixture = await requestSameBook([quijote]);
+
+      fixture.componentInstance.renewFromRepeat(quijote);
+      const renew = http.expectOne(`${API_URL}/loans/1/renew`);
+      expect(renew.request.method).toBe('POST');
+      renew.flush({ ...quijote, dueDate: '2026-10-21', renewals: 1 });
+      http.expectNone((r) => r.method === 'POST' && r.url === `${API_URL}/loans`);
+      flushAuxiliary();
+      (await nextSearch(fixture)).flush(page([quijote]));
+
+      expect(TestBed.inject(NotifyService).notice()?.text).toContain('21/10/2026');
+      expect(fixture.componentInstance.isModalOpen()).toBe(false);
+    });
+
+    it('si el préstamo existente está vencido, solo permite cerrar el aviso', async () => {
+      await requestSameBook([{ ...quijote, status: 'OVERDUE' }]);
+      const buttons = Array.from(document.querySelectorAll('app-loan-repeat-dialog .repeat-actions button')).map(
+        (b) => b.textContent?.trim(),
+      );
+      expect(buttons).toEqual(['Entendido']);
+      expect(document.body.textContent).toContain('debe devolverlo');
+    });
+  });
+
+  it('renueva desde el menú solo los préstamos en plazo', async () => {
+    const fixture = await create();
+    const page_ = fixture.componentInstance;
+    expect(page_.activeLoanActions.map((a) => a.id)).toEqual(['renew', 'return']);
+    expect(page_.overdueLoanActions.map((a) => a.id)).toEqual(['return']);
+
+    page_.onAction('renew', quijote);
+    await fixture.whenStable();
+    expect(document.querySelector('.confirm-message strong')?.textContent).toBe('El Quijote');
+
+    page_.confirmRenew();
+    http.expectOne(`${API_URL}/loans/1/renew`).flush({ ...quijote, dueDate: '2026-10-21', renewals: 1 });
+    flushAuxiliary();
+    (await nextSearch(fixture)).flush(page([{ ...quijote, renewals: 1 }]));
+    expect(page_.loanToRenew()).toBeNull();
+    await fixture.whenStable();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Renovado 1 vez');
   });
 });

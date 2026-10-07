@@ -11,10 +11,11 @@ import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angu
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
-import { Book, BookInput, Member } from '../core/models';
+import { Book, BookInput, Loan, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
 import { BookDuplicate, BookDuplicateDialogComponent } from './book-duplicate-dialog.component';
+import { LoanRepeat, LoanRepeatDialogComponent } from './loan-repeat-dialog.component';
 import { ComboboxComponent, ComboboxOption } from '../shared/combobox.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
@@ -33,6 +34,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
     IconComponent,
     ActionMenuComponent,
     BookDuplicateDialogComponent,
+    LoanRepeatDialogComponent,
     ComboboxComponent,
     ModalComponent,
     ConfirmDialogComponent,
@@ -465,6 +467,15 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       (cancel)="cancelDelete()"
     />
 
+    <!-- Aviso: el usuario ya tiene este libro sin devolver -->
+    <app-loan-repeat-dialog
+      [repeat]="repeat()"
+      [busy]="quickLoanSubmitting()"
+      (lendAnyway)="confirmRepeatLend()"
+      (renew)="renewFromRepeat($event)"
+      (cancel)="repeat.set(null)"
+    />
+
     <!-- Modal de Préstamo Rápido desde Catálogo -->
     <app-modal
       [open]="quickLoanModalOpen()"
@@ -797,6 +808,8 @@ export class BooksPage implements OnInit {
    * mismo título y autor pero otro género (se muestra la diferencia para confirmar).
    */
   readonly duplicate = signal<BookDuplicate | null>(null);
+  /** Aviso de préstamo repetido en el préstamo rápido. */
+  readonly repeat = signal<LoanRepeat | null>(null);
   /** Motivo por el que el servidor rechazó la baja (p. ej. historial); se ve dentro del diálogo. */
   readonly deleteError = signal<string | null>(null);
 
@@ -1121,6 +1134,53 @@ export class BooksPage implements OnInit {
     const memberId = this.quickLoanMember.value;
     if (!book || !memberId) return;
 
+    // Antes de prestar se comprueba si el usuario ya tiene este libro sin devolver.
+    this.quickLoanSubmitting.set(true);
+    this.api.activeLoansFor(memberId, book.id).subscribe({
+      next: (existing) => {
+        this.quickLoanSubmitting.set(false);
+        if (existing.length === 0) {
+          this.doQuickLoan(book, memberId);
+          return;
+        }
+        this.repeat.set({
+          memberName: this.membersList().find((m) => m.id === memberId)?.name ?? existing[0].memberName,
+          bookTitle: book.title,
+          existing,
+        });
+      },
+      error: () => this.quickLoanSubmitting.set(false),
+    });
+  }
+
+  /** El usuario confirma que quiere otro préstamo del mismo libro. */
+  confirmRepeatLend(): void {
+    const book = this.quickLoanBook();
+    const memberId = this.quickLoanMember.value;
+    this.repeat.set(null);
+    if (book && memberId) {
+      this.doQuickLoan(book, memberId);
+    }
+  }
+
+  /** En lugar de prestar otro ejemplar, renueva el préstamo que ya tenía. */
+  renewFromRepeat(loan: Loan): void {
+    this.quickLoanSubmitting.set(true);
+    this.api.renewLoan(loan.id).subscribe({
+      next: (renewed) => {
+        const [y, m, d] = renewed.dueDate.split('-');
+        this.notify.ok(`Préstamo de «${renewed.bookTitle}» renovado: ahora vence el ${d}/${m}/${y}`);
+        this.repeat.set(null);
+        this.quickLoanModalOpen.set(false);
+        this.quickLoanBook.set(null);
+        this.quickLoanSubmitting.set(false);
+        this.load();
+      },
+      error: () => this.quickLoanSubmitting.set(false),
+    });
+  }
+
+  private doQuickLoan(book: Book, memberId: number): void {
     this.quickLoanSubmitting.set(true);
     this.api.lend(book.id, memberId).subscribe({
       next: (loan) => {
