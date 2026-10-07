@@ -84,8 +84,8 @@ describe('LoansPage', () => {
 
     const req = http.expectOne(isLoansSearch);
     expect(req.request.params.get('status')).toBe('ALL');
-    expect(req.request.params.get('sort')).toBe('dueDate');
-    expect(req.request.params.get('direction')).toBe('asc');
+    expect(req.request.params.get('sort')).toBe('loanDate'); // los más recientes primero
+    expect(req.request.params.get('direction')).toBe('desc');
     expect(req.request.params.get('page')).toBe('0');
     expect(req.request.params.get('size')).toBe('10');
     expect(req.request.params.has('q')).toBe(false);
@@ -125,6 +125,14 @@ describe('LoansPage', () => {
 
     fixture.componentInstance.toggleSort('bookTitle');
     expect((await nextSearch(fixture)).request.params.get('direction')).toBe('desc');
+  });
+
+  it('al ordenar por una fecha empieza por la más reciente', async () => {
+    const fixture = await create();
+    fixture.componentInstance.toggleSort('dueDate');
+    const req = await nextSearch(fixture);
+    expect(req.request.params.get('sort')).toBe('dueDate');
+    expect(req.request.params.get('direction')).toBe('desc');
   });
 
   it('busca en el servidor 300 ms después de dejar de escribir', async () => {
