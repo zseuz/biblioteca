@@ -14,6 +14,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class BibliotecaApplication {
 
+    /**
+     * Punto de entrada: arranca Spring Boot, que crea todos los componentes (controladores,
+     * servicios, repositorios), configura la base de datos y levanta el servidor web en el puerto 8080.
+     */
     public static void main(String[] args) {
         SpringApplication.run(BibliotecaApplication.class, args);
     }

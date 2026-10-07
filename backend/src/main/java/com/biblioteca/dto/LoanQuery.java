@@ -16,7 +16,9 @@ import java.util.Locale;
  */
 public record LoanQuery(StatusFilter status, String text, SortField sort, boolean ascending, int page, int size) {
 
+    /** Préstamos por página si no se indica {@code size}. */
     public static final int DEFAULT_SIZE = 10;
+    /** Tope de elementos por página, para que nadie pida el historial entero de una vez. */
     public static final int MAX_SIZE = 100;
 
     /** Normaliza los valores recibidos: nunca página negativa ni tamaños fuera de rango. */
@@ -44,6 +46,13 @@ public record LoanQuery(StatusFilter status, String text, SortField sort, boolea
                 size);
     }
 
+    /**
+     * Convierte {@code direction} en orden ascendente o descendente. Sin {@code direction}: si
+     * tampoco hay {@code sort} se usa descendente (los préstamos más recientes primero); si hay
+     * {@code sort}, ascendente.
+     *
+     * @throws BadRequestException si el valor no es «asc» ni «desc»
+     */
     private static boolean parseAscending(String direction, boolean defaultSort) {
         if (direction == null || direction.isBlank()) {
             return !defaultSort; // orden por defecto: los más recientes primero

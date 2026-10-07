@@ -30,11 +30,14 @@ public class StatsService {
     /** Meses que cubre la serie temporal, incluido el actual. */
     static final int MONTHS = 6;
 
+    /** Repositorios de los que salen los contadores y rankings. */
     private final BookRepository books;
     private final MemberRepository members;
     private final LoanRepository loans;
+    /** Reloj inyectado para calcular vencidos y el mes actual (fijo en las pruebas). */
     private final Clock clock;
 
+    /** Inyección por constructor de los repositorios y el reloj. */
     public StatsService(BookRepository books, MemberRepository members, LoanRepository loans, Clock clock) {
         this.books = books;
         this.members = members;
@@ -42,6 +45,11 @@ public class StatsService {
         this.clock = clock;
     }
 
+    /**
+     * Calcula todo el panel en una llamada: totales de libros y usuarios, préstamos en plazo,
+     * vencidos y devueltos, la serie de los últimos meses y los rankings. Cada dato sale de una
+     * consulta de agregación en la base, sin cargar todos los registros en memoria.
+     */
     public StatsResponse compute() {
         LocalDate today = LocalDate.now(clock);
         long overdue = loans.countByReturnDateIsNullAndDueDateBefore(today);

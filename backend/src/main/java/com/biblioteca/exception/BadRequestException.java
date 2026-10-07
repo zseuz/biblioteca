@@ -6,6 +6,7 @@ package com.biblioteca.exception;
  */
 public class BadRequestException extends RuntimeException {
 
+    /** @param message explicación para el cliente; se devuelve tal cual en el campo «message» (400). */
     public BadRequestException(String message) {
         super(message);
     }
