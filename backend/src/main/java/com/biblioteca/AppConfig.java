@@ -11,6 +11,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class AppConfig implements WebMvcConfigurer {
 
+    /**
+     * Sitios web autorizados a llamar a la API desde el navegador (CORS). Se leen de
+     * {@code app.cors.allowed-origins}; varias direcciones separadas por comas se convierten en un array.
+     */
     @Value("${app.cors.allowed-origins}")
     private String[] allowedOrigins;
 
@@ -23,6 +27,11 @@ public class AppConfig implements WebMvcConfigurer {
         return Clock.systemDefaultZone();
     }
 
+    /**
+     * Regla CORS: el navegador bloquea las llamadas entre dominios distintos (la web en el
+     * puerto 4200 y la API en el 8080) salvo que el servidor las permita. Aquí se permiten solo las
+     * rutas {@code /api/**}, solo los métodos que usa la aplicación y solo desde los orígenes configurados.
+     */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")

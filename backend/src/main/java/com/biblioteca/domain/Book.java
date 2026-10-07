@@ -25,25 +25,38 @@ import java.util.Objects;
 @Table(name = "book", indexes = @Index(name = "idx_book_title", columnList = "title"))
 public class Book {
 
+    /** Identificador del libro; lo genera la base de datos al guardar (1, 2, 3…). */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Número de versión para el bloqueo optimista: Hibernate lo incrementa en cada cambio y
+     * rechaza el guardado si otra transacción lo modificó antes (evita prestar dos veces el último ejemplar).
+     */
     @Version
     private long version;
 
+    /** Título del libro (máximo 200 caracteres, igual que valida la API). */
     @Column(nullable = false, length = 200)
     private String title;
 
+    /** Autor (máximo 150 caracteres). */
     @Column(nullable = false, length = 150)
     private String author;
 
+    /** Género literario (máximo 80 caracteres). Puede ser uno sugerido o uno nuevo. */
     @Column(nullable = false, length = 80)
     private String genre;
 
+    /** Ejemplares que tiene la biblioteca en total (prestados y disponibles). */
     @Column(nullable = false)
     private int totalCopies;
 
+    /**
+     * Ejemplares que se pueden prestar ahora mismo. Solo cambia con {@link #borrowCopy()},
+     * {@link #returnCopy()}, {@link #addCopies(int)} y {@link #update}; nunca baja de 0 ni supera el total.
+     */
     @Column(nullable = false)
     private int availableCopies;
 
@@ -51,6 +64,11 @@ public class Book {
     protected Book() {
     }
 
+    /**
+     * Crea un libro nuevo con todos sus ejemplares disponibles.
+     *
+     * @throws BusinessRuleException si no tiene al menos 1 ejemplar
+     */
     public Book(String title, String author, String genre, int totalCopies) {
         if (totalCopies < 1) {
             throw new BusinessRuleException("Debe haber al menos 1 ejemplar");
@@ -62,6 +80,7 @@ public class Book {
         this.availableCopies = totalCopies;
     }
 
+    /** ¿Queda al menos un ejemplar para prestar? (falso = libro agotado) */
     public boolean isAvailable() {
         return availableCopies > 0;
     }
@@ -122,6 +141,10 @@ public class Book {
         this.availableCopies = totalCopies - onLoan;
     }
 
+    /**
+     * Getters: solo lectura. No hay setters públicos a propósito: los datos cambian únicamente
+     * con los métodos de negocio de arriba, que validan las reglas.
+     */
     public Long getId() { return id; }
     public String getTitle() { return title; }
     public String getAuthor() { return author; }
