@@ -85,8 +85,8 @@ Solo necesitas instalar **tres programas**. **No** hace falta instalar Maven ni 
 
 | Software | Versión | ¿Para qué? | Comprobar en una terminal | Descarga |
 |---|---|---|---|---|
-| **Git** | cualquiera reciente | Descargar el repositorio | `git --version` | [git-scm.com](https://git-scm.com/downloads) |
-| **JDK (Java)** | **21 o superior** | Compilar y ejecutar el backend | `java -version` | [Eclipse Temurin](https://adoptium.net/) |
+| **Git** | cualquiera reciente | Descargar el repositorio | `git --version` | [git-scm.com](https://git-scm.com/install/windows) |
+| **JDK (Java)** | **21 o superior** | Compilar y ejecutar el backend | `java -version` | [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) |
 | **Node.js** (incluye npm) | **22.22+** (LTS) o **24.15+** | Instalar y ejecutar el frontend | `node -v` y `npm -v` | [nodejs.org](https://nodejs.org/) |
 
 > [!IMPORTANT]
@@ -621,7 +621,7 @@ La URL de la API que usa el frontend está en `frontend/src/app/core/api.service
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
-| `java` no se reconoce como comando | JDK no instalado o fuera del PATH | Instala Temurin 21+ y abre una terminal nueva |
+| `java` no se reconoce como comando | JDK no instalado o fuera del PATH | Instala el JDK 21 o superior y abre una terminal nueva |
 | `release version 21 not supported` | JDK anterior a 21 | Instala JDK 21 o superior y comprueba `java -version` |
 | `./mvnw: Permission denied` (macOS/Linux) | El script no es ejecutable | `chmod +x mvnw` |
 | `Port 8080 was already in use` | Otra instancia del backend sigue abierta | Ciérrala o cambia el puerto con `SERVER_PORT=8081` (y `API_URL` en el frontend) |
