@@ -42,6 +42,7 @@ public record BookRequest(
         genre = trim(genre);
     }
 
+    /** Quita los espacios del inicio y del final; respeta {@code null} para que lo detecte @NotBlank. */
     private static String trim(String value) {
         return value == null ? null : value.trim();
     }

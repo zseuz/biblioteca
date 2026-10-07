@@ -35,12 +35,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/loans")
 public class LoanController {
 
+    /** Servicio con las reglas de préstamo; el controlador solo traduce HTTP ↔ Java. */
     private final LoanService service;
 
+    /** Spring inyecta el servicio por constructor. */
     public LoanController(LoanService service) {
         this.service = service;
     }
 
+    /**
+     * GET /api/loans → una página del historial. Los parámetros llegan como texto y
+     * {@link LoanQuery#fromParams} los valida (400 si alguno no es válido).
+     */
     @Operation(summary = "Historial de préstamos (paginado)",
             description = "Filtros, búsqueda, orden y paginación se resuelven en la base de datos. "
                     + "`status` de cada préstamo: ACTIVE (en plazo), OVERDUE (vencido) o RETURNED (devuelto). "
@@ -65,6 +71,7 @@ public class LoanController {
         return service.search(LoanQuery.fromParams(status, q, sort, direction, page, size));
     }
 
+    /** GET /api/loans/active → la web lo consulta antes de prestar para avisar de un préstamo repetido. */
     @Operation(summary = "Préstamos sin devolver de un usuario para un libro",
             description = "Sirve para avisar antes de prestar otra vez el mismo libro al mismo usuario.")
     @GetMapping("/active")
@@ -74,6 +81,7 @@ public class LoanController {
         return service.activeLoansFor(memberId, bookId);
     }
 
+    /** POST /api/loans/{id}/renew → renueva si faltan 5 días o menos para vencer; si no, 409 con la fecha. */
     @Operation(summary = "Renovar un préstamo",
             description = "Solo préstamos en plazo y cuando faltan 5 días o menos para el vencimiento (configurable): "
                     + "la fecha límite pasa a ser hoy + el plazo configurado (14 días). Antes de ese momento responde "
@@ -87,6 +95,7 @@ public class LoanController {
         return service.renew(id);
     }
 
+    /** GET /api/loans/{id}/renewals → préstamo inicial y cada renovación con fecha y hora. */
     @Operation(summary = "Historial de renovaciones",
             description = "Datos del préstamo inicial (fecha y vencimiento original) y cada renovación: "
                     + "fecha y hora, vencimiento anterior y nuevo.")
@@ -97,6 +106,7 @@ public class LoanController {
         return service.renewalHistory(id);
     }
 
+    /** GET /api/loans/summary → total, en plazo, vencidos y devueltos (pestañas e indicadores). */
     @Operation(summary = "Contadores por estado",
             description = "Total, activos (en plazo), vencidos y devueltos, en una sola consulta.")
     @GetMapping("/summary")
@@ -104,6 +114,7 @@ public class LoanController {
         return service.summary();
     }
 
+    /** POST /api/loans → registra el préstamo (201) si se cumplen todas las reglas; si no, 409 con el motivo. */
     @Operation(summary = "Prestar un libro",
             description = "Reglas: debe haber ejemplares disponibles, el usuario no puede tener préstamos vencidos "
                     + "y no puede superar 3 préstamos activos. La fecha límite se calcula en el servidor (14 días).")
@@ -119,6 +130,7 @@ public class LoanController {
         return service.lend(request);
     }
 
+    /** POST /api/loans/{id}/return → marca el préstamo como devuelto y repone el ejemplar. */
     @Operation(summary = "Registrar la devolución", description = "Repone el ejemplar en el stock del libro.")
     @ApiResponse(responseCode = "200", description = "Devolución registrada")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))

@@ -256,8 +256,10 @@ export class LoanRenewalsDialogComponent {
   readonly loan = input<Loan | null>(null);
   /** Historial cargado; mientras sea {@code null} se muestra "Cargando". */
   readonly history = input<LoanRenewalHistory | null>(null);
+  /** Cerrar la ventana. */
   readonly close = output<void>();
 
+  /** Fecha en formato 07/10/2026 (acepta también fecha y hora). */
   protected date(iso: string): string {
     return formatDate(iso);
   }

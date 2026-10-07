@@ -9,6 +9,7 @@ package com.biblioteca.exception;
  */
 public class BusinessRuleException extends RuntimeException {
 
+    /** @param message motivo de la regla incumplida; el usuario lo lee tal cual (409). */
     public BusinessRuleException(String message) {
         super(message);
     }

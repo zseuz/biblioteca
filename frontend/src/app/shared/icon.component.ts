@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
+/** Nombres de los iconos disponibles. TypeScript avisa si se pide uno que no existe. */
 export type IconName =
   | 'book'
   | 'users'
@@ -29,8 +30,13 @@ export type IconName =
   | 'book-open'
   | 'more-vertical';
 
+/**
+ * Iconos SVG propios (sin librería externa). Cada nombre dibuja sus trazos con el color del
+ * texto actual, así que el icono hereda el color de donde se coloca.
+ */
 @Component({
   selector: 'app-icon',
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <svg
@@ -196,7 +202,10 @@ export type IconName =
   `,
 })
 export class IconComponent {
+  /** Qué icono dibujar. */
   readonly name = input.required<IconName>();
+  /** Tamaño en píxeles (ancho y alto). */
   readonly size = input<number>(18);
+  /** Clases CSS adicionales, por si hace falta ajustar el estilo desde fuera. */
   readonly extraClass = input<string>('');
 }

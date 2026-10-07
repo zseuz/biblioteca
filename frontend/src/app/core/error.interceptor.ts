@@ -23,6 +23,11 @@ export function messageFor(err: HttpErrorResponse): string {
  */
 export const SILENT_ERRORS = new HttpContextToken<boolean>(() => false);
 
+/**
+ * Interceptor HTTP: todas las peticiones de la app pasan por aquí. Si una falla, muestra el
+ * mensaje del backend en el aviso general (salvo las marcadas con SILENT_ERRORS) y vuelve a
+ * lanzar el error para que la pantalla pueda reaccionar (quitar el spinner, marcar un campo…).
+ */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const notify = inject(NotifyService);
   return next(req).pipe(

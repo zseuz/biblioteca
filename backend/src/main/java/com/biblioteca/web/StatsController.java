@@ -14,12 +14,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/stats")
 public class StatsController {
 
+    /** Servicio que calcula las estadísticas. */
     private final StatsService service;
 
+    /** Spring inyecta el servicio por constructor. */
     public StatsController(StatsService service) {
         this.service = service;
     }
 
+    /** GET /api/stats → todos los datos del panel de estadísticas en una sola respuesta. */
     @Operation(summary = "Obtener las estadísticas",
             description = "Totales, préstamos vencidos y devueltos, serie de los últimos 6 meses y rankings. "
                     + "Todo se agrega en la base de datos.")

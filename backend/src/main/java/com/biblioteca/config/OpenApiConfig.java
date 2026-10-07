@@ -23,6 +23,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+    /**
+     * Datos generales que muestra Swagger UI (título, descripción y versión de la API). Los
+     * endpoints en sí se documentan solos a partir de los controladores y sus anotaciones @Operation.
+     */
     @Bean
     OpenAPI libraryOpenApi() {
         return new OpenAPI()

@@ -100,6 +100,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long>, LoanSearchRep
             """)
     List<StatEntry> topBooks(Pageable limit);
 
+    /** Préstamos por género (histórico), de más a menos, para la gráfica de géneros. */
     @Query("""
             select new com.biblioteca.dto.StatEntry(l.book.genre, count(l))
             from Loan l group by l.book.genre
@@ -107,6 +108,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long>, LoanSearchRep
             """)
     List<StatEntry> loansByGenre();
 
+    /** Usuarios con más préstamos (histórico); {@code limit} indica cuántos devolver. */
     @Query("""
             select new com.biblioteca.dto.StatEntry(l.member.name, count(l))
             from Loan l group by l.member.id, l.member.name

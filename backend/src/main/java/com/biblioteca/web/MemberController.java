@@ -28,12 +28,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/members")
 public class MemberController {
 
+    /** Servicio con la lógica de usuarios; el controlador solo traduce HTTP ↔ Java. */
     private final MemberService service;
 
+    /** Spring inyecta el servicio por constructor. */
     public MemberController(MemberService service) {
         this.service = service;
     }
 
+    /** GET /api/members → usuarios con su número de préstamos activos y totales. */
     @Operation(summary = "Listar usuarios",
             description = "Ordenados por nombre, con sus contadores de préstamos (`activeLoans`, `totalLoans`).")
     @GetMapping
@@ -41,6 +44,7 @@ public class MemberController {
         return service.list();
     }
 
+    /** POST /api/members → crea el usuario (201); 409 si el correo ya existe. */
     @Operation(summary = "Registrar un usuario",
             description = "Nombre de hasta 100 caracteres y correo único (sin distinguir mayúsculas).")
     @ApiResponse(responseCode = "201", description = "Usuario creado")
@@ -52,6 +56,7 @@ public class MemberController {
         return service.create(request);
     }
 
+    /** PUT /api/members/{id} → cambia nombre y correo (409 si el correo es de otro usuario). */
     @Operation(summary = "Editar un usuario")
     @ApiResponse(responseCode = "200", description = "Usuario actualizado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -63,6 +68,7 @@ public class MemberController {
         return service.update(id, request);
     }
 
+    /** DELETE /api/members/{id} → borra el usuario (204) si no tiene préstamos; si tiene, 409. */
     @Operation(summary = "Eliminar un usuario", description = "Solo usuarios sin historial de préstamos.")
     @ApiResponse(responseCode = "204", description = "Usuario eliminado")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
