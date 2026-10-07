@@ -25,7 +25,6 @@ export interface ActionMenuItem {
   disabled?: boolean;
 }
 
-const MENU_WIDTH = 190;
 const GAP = 6;
 
 /**
@@ -67,7 +66,7 @@ const GAP = 6;
         role="menu"
         [attr.aria-label]="label()"
         [style.top.px]="top()"
-        [style.left.px]="left()"
+        [style.right.px]="right()"
         (keydown)="onMenuKeydown($event)"
       >
         @for (item of items(); track item.id) {
@@ -123,7 +122,9 @@ const GAP = 6;
     .menu-panel {
       position: fixed;
       z-index: 900;
-      width: 190px; /* = MENU_WIDTH */
+      width: max-content; /* crece con etiquetas largas */
+      min-width: 190px;
+      max-width: calc(100vw - 16px);
       padding: 0.35rem;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -191,7 +192,7 @@ export class ActionMenuComponent {
 
   protected readonly open = signal(false);
   protected readonly top = signal(0);
-  protected readonly left = signal(0);
+  protected readonly right = signal(0);
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
@@ -296,8 +297,8 @@ export class ActionMenuComponent {
     const estimatedHeight = this.items().length * 40 + 16;
     const fitsBelow = rect.bottom + GAP + estimatedHeight <= window.innerHeight;
 
-    // Alineado al borde derecho del botón, sin salirse de la pantalla por la izquierda.
-    this.left.set(Math.max(8, rect.right - MENU_WIDTH));
+    // Alineado al borde derecho del botón (el panel crece hacia la izquierda según su contenido).
+    this.right.set(Math.max(8, document.documentElement.clientWidth - rect.right));
     this.top.set(fitsBelow ? rect.bottom + GAP : Math.max(8, rect.top - GAP - estimatedHeight));
   }
 
