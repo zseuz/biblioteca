@@ -2,7 +2,14 @@ package com.biblioteca.web;
 
 import com.biblioteca.dto.BookRequest;
 import com.biblioteca.dto.BookResponse;
+import com.biblioteca.exception.ApiError;
 import com.biblioteca.service.BookService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -18,6 +25,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Catálogo de libros. Capa HTTP fina: valida la entrada y delega en {@link BookService}. */
+@Tag(name = "Libros")
 @RestController
 @RequestMapping("/api/books")
 public class BookController {
@@ -28,32 +36,48 @@ public class BookController {
         this.service = service;
     }
 
-    /** {@code GET /api/books?q=texto}: lista el catálogo o busca por título, autor o género. 200. */
+    @Operation(summary = "Listar o buscar libros",
+            description = "Sin `q` devuelve todo el catálogo ordenado por título. Con `q` busca en título, "
+                    + "autor y género sin distinguir mayúsculas.")
     @GetMapping
-    public List<BookResponse> search(@RequestParam(required = false) String q) {
+    public List<BookResponse> search(
+            @Parameter(description = "Texto a buscar", example = "garcía") @RequestParam(required = false) String q) {
         return service.search(q);
     }
 
-    /** {@code GET /api/books/{id}}: 200, o 404 si no existe. */
+    @Operation(summary = "Obtener un libro")
+    @ApiResponse(responseCode = "200", description = "Libro encontrado")
+    @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping("/{id}")
     public BookResponse get(@PathVariable Long id) {
         return service.get(id);
     }
 
-    /** {@code POST /api/books}: 201 con el libro creado, o 400 si los datos no son válidos. */
+    @Operation(summary = "Crear un libro", description = "Todos los ejemplares quedan disponibles.")
+    @ApiResponse(responseCode = "201", description = "Libro creado")
+    @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public BookResponse create(@Valid @RequestBody BookRequest request) {
         return service.create(request);
     }
 
-    /** {@code PUT /api/books/{id}}: 200, 400 (validación), 404 o 409 (total menor que los prestados). */
+    @Operation(summary = "Editar un libro", description = "Conserva los ejemplares que están prestados.")
+    @ApiResponse(responseCode = "200", description = "Libro actualizado")
+    @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "El total sería menor que los ejemplares prestados",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/{id}")
     public BookResponse update(@PathVariable Long id, @Valid @RequestBody BookRequest request) {
         return service.update(id, request);
     }
 
-    /** {@code DELETE /api/books/{id}}: 204, 404, o 409 si tiene historial de préstamos. */
+    @Operation(summary = "Eliminar un libro", description = "Solo libros sin historial de préstamos.")
+    @ApiResponse(responseCode = "204", description = "Libro eliminado")
+    @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Tiene historial de préstamos",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
