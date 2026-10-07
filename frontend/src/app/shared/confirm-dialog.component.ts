@@ -46,7 +46,7 @@ import { ModalComponent } from './modal.component';
         @if (showConfirm()) {
           <button
             type="button"
-            class="btn confirm-btn"
+            class="btn"
             [class.btn-danger]="variant() === 'danger'"
             [class.btn-primary]="variant() !== 'danger'"
             [class.is-loading]="loading()"
@@ -119,28 +119,6 @@ import { ModalComponent } from './modal.component';
       gap: 0.5rem;
     }
 
-    /* Botón con carga: mismo ancho siempre, spinner superpuesto y con retardo. */
-    .confirm-btn {
-      position: relative;
-    }
-    .confirm-btn.is-loading .btn-label {
-      visibility: hidden;
-    }
-    .btn-spinner {
-      position: absolute;
-      inset: 0;
-      margin: auto;
-      opacity: 0;
-      animation:
-        spin 0.6s linear infinite,
-        spinnerIn 0.15s ease-out 0.15s forwards;
-    }
-
-    @keyframes spinnerIn {
-      to {
-        opacity: 1;
-      }
-    }
     @keyframes errorIn {
       from {
         opacity: 0;

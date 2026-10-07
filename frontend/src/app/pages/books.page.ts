@@ -429,11 +429,11 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
         <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
           Cancelar
         </button>
-        <button type="submit" form="book-form" class="btn btn-primary" [disabled]="saving()">
+        <button type="submit" form="book-form" class="btn btn-primary" [disabled]="saving()" [class.is-loading]="saving()" [attr.aria-busy]="saving()">
+          <span class="btn-label">{{ editing() ? 'Guardar cambios' : 'Agregar libro' }}</span>
           @if (saving()) {
-            <span class="spinner-sm"></span>
+            <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
           }
-          {{ editing() ? 'Guardar cambios' : 'Agregar libro' }}
         </button>
       </div>
     </app-modal>
@@ -499,11 +499,11 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
           class="btn btn-primary"
           [disabled]="!selectedLoanMemberId() || quickLoanSubmitting()"
           (click)="submitQuickLoan()"
-        >
+         [class.is-loading]="quickLoanSubmitting()" [attr.aria-busy]="quickLoanSubmitting()">
+          <span class="btn-label">Confirmar préstamo</span>
           @if (quickLoanSubmitting()) {
-            <span class="spinner-sm"></span>
+            <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
           }
-          Confirmar préstamo
         </button>
       </div>
     </app-modal>
