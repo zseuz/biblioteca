@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { API_URL } from '../core/api.service';
 import { Book } from '../core/models';
 import { BooksPage } from './books.page';
@@ -31,7 +32,7 @@ describe('BooksPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [BooksPage],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
   });
@@ -329,6 +330,35 @@ describe('BooksPage', () => {
       const fixture = await fill({ title: 'It', author: 'Ana', genre: 'Arte', totalCopies: 1000 });
       expect(errors()).toEqual([]);
       expect(fixture.componentInstance.form.valid).toBe(true);
+    });
+  });
+
+
+  describe('sin datos o sin conexión', () => {
+    it('si el servidor no responde, avisa del error en lugar de decir que el catálogo está vacío', async () => {
+      const fixture = TestBed.createComponent(BooksPage);
+      fixture.detectChanges();
+      http.expectOne(isList).error(new ProgressEvent('error'));
+      await fixture.whenStable();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('No se pudieron cargar los libros');
+      expect(text).not.toContain('El catálogo está actualmente vacío');
+
+      fixture.componentInstance.load(); // «Reintentar»
+      http.expectOne(isList).flush([dune]);
+      await fixture.whenStable();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Dune');
+    });
+
+    it('el préstamo rápido avisa si todavía no hay usuarios registrados', async () => {
+      const fixture = create();
+      fixture.componentInstance.openQuickLoan(dune);
+      http.expectOne(`${API_URL}/members`).flush([]);
+      await fixture.whenStable();
+
+      expect(document.querySelector('.missing-data')?.textContent).toContain('Aún no hay usuarios registrados');
+      expect(document.querySelector('.missing-data a')?.getAttribute('href')).toBe('/usuarios');
     });
   });
 

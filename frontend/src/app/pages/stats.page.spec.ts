@@ -67,4 +67,36 @@ describe('StatsPage', () => {
     expect(root.textContent).toMatch(/Activos al día\s*7/);
   });
 
+
+  it('sin datos lo informa en el panel y en cada gráfica', async () => {
+    const fixture = TestBed.createComponent(StatsPage);
+    fixture.detectChanges();
+    http.expectOne(`${API_URL}/stats`).flush({
+      totalBooks: 0,
+      totalMembers: 0,
+      activeLoans: 0,
+      overdueLoans: 0,
+      returnedLoans: 0,
+      loansByMonth: ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'].map((label) => ({ label, count: 0 })),
+      topBooks: [],
+      loansByGenre: [],
+      topMembers: [],
+    });
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Aún no hay datos registrados');
+    expect(text).toContain('No hay préstamos registrados en los últimos 6 meses');
+    expect(text).toContain('Aún no se ha registrado ningún préstamo');
+  });
+
+  it('si el servidor no responde, lo dice y permite reintentar', async () => {
+    const fixture = TestBed.createComponent(StatsPage);
+    fixture.detectChanges();
+    http.expectOne(`${API_URL}/stats`).error(new ProgressEvent('error'));
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No se pudieron cargar las estadísticas');
+  });
+
 });
