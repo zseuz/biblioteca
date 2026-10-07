@@ -194,4 +194,50 @@ describe('BooksPage', () => {
       expect(fixture.componentInstance.quickLoanMember.value).toBe(1);
     });
   });
+
+  describe('género literario', () => {
+    const genreInput = () => document.querySelector<HTMLInputElement>('input#genre');
+
+    it('es un campo de selección que sugiere géneros y los que ya tienen los libros', async () => {
+      const fixture = create();
+      fixture.componentInstance.openCreate();
+      await fixture.whenStable();
+
+      const options = fixture.componentInstance.genreOptions().map((o) => o.label);
+      expect(options).toEqual(expect.arrayContaining(['Novela', 'Terror', 'Ciencia ficción']));
+      expect(genreInput()?.getAttribute('role')).toBe('combobox');
+      expect(genreInput()?.getAttribute('maxlength')).toBe('80');
+    });
+
+    it('admite escribir un género nuevo y lo envía al crear el libro', async () => {
+      const fixture = create();
+      fixture.componentInstance.openCreate();
+      await fixture.whenStable();
+
+      const input = genreInput()!;
+      input.value = 'Realismo sucio';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new FocusEvent('blur'));
+      await fixture.whenStable();
+      expect(fixture.componentInstance.form.getRawValue().genre).toBe('Realismo sucio');
+
+      fixture.componentInstance.form.patchValue({ title: 'Cien poemas', author: 'Alguien', totalCopies: 1 });
+      fixture.componentInstance.save();
+      const check = http.expectOne(isDuplicateCheck);
+      expect(check.request.params.get('genre')).toBe('Realismo sucio');
+      check.flush({ sameBook: null, differentGenre: [] });
+      http.expectOne((r) => r.method === 'POST' && r.url === `${API_URL}/books`).flush({});
+      http.expectOne(isList).flush([]);
+    });
+
+    it('al editar muestra el género del libro, aunque no esté en las sugerencias', async () => {
+      const fixture = create();
+      const cyber = { ...dune, id: 2, title: 'Neuromante', genre: 'Cyberpunk' };
+      fixture.componentInstance.edit(cyber);
+      await fixture.whenStable();
+
+      expect(genreInput()?.value).toBe('Cyberpunk');
+    });
+  });
+
 });

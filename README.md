@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-131%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-146%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -467,6 +467,7 @@ flowchart TD
 ### Libros
 
 - **Nuevo libro:** botón superior derecho. Todos los campos son obligatorios y debe haber al menos 1 ejemplar.
+- **Género literario:** es un selector con búsqueda, tanto al crear como al editar. Al hacer clic muestra los géneros sugeridos (Novela, Terror, Ciencia ficción…) más los que ya tienen los libros del catálogo; al escribir filtra, y si lo escrito no está en la lista aparece **«Añadir género …»** para usar uno nuevo (máx. 80 caracteres). Lo que escribas queda como valor aunque no elijas una opción; si coincide con uno existente (sin distinguir mayúsculas ni tildes) se usa su grafía.
 - **Buscar:** escribe en el buscador (título, autor o género). Combina la búsqueda con el filtro de género y con *Todos / Disponibles / Agotados*.
 - **Ordenar:** haz clic en la cabecera de una columna.
 - **Vista:** alterna entre tabla y tarjetas con los iconos de la derecha.
@@ -620,7 +621,7 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
 | Backend (65 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (66 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones y estados de carga de los botones |
+| Frontend (81 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
