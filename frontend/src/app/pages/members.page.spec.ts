@@ -110,6 +110,7 @@ describe('MembersPage', () => {
       expect(fixture.componentInstance.canDelete()).toBe(false);
       expect(document.body.textContent).toContain('No se puede eliminar');
       expect(document.body.textContent).toContain('tiene 2 préstamos activos y 5 préstamos en su historial');
+      expect(document.querySelector('.confirm-message strong')?.textContent).toBe('Ana Torres');
       // Solo hay un botón ("Entendido"): no existe forma de lanzar la petición destinada a fallar.
       const buttons = Array.from(document.querySelectorAll('.confirm-actions button')).map((b) =>
         b.textContent?.trim(),
@@ -124,7 +125,9 @@ describe('MembersPage', () => {
       const fixture = create();
       fixture.componentInstance.remove(noLoans);
       await fixture.whenStable();
-      expect(document.body.textContent).toContain('¿Seguro que deseas eliminar a «Bruno Díaz»?');
+      expect(document.body.textContent).toContain('¿Seguro que deseas eliminar a Bruno Díaz?');
+      // El nombre va en negrita.
+      expect(document.querySelector('.confirm-message strong')?.textContent).toBe('Bruno Díaz');
 
       fixture.componentInstance.confirmDelete();
       http.expectOne((r) => r.method === 'DELETE' && r.url === `${API_URL}/members/8`).flush(null);
