@@ -274,7 +274,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
                   <td class="col-status" data-label="Estado">
                     <span class="badge" [class.ok]="b.available" [class.bad]="!b.available">
                       <span class="dot"></span>
-                      {{ b.available ? 'Disponible' : 'Prestado' }}
+                      {{ b.available ? 'Disponible' : 'Agotado' }}
                     </span>
                   </td>
                   <td class="col-actions">
@@ -298,7 +298,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
                 <span class="genre-tag">{{ b.genre }}</span>
                 <span class="badge" [class.ok]="b.available" [class.bad]="!b.available">
                   <span class="dot"></span>
-                  {{ b.available ? 'Disponible' : 'Prestado' }}
+                  {{ b.available ? 'Disponible' : 'Agotado' }}
                 </span>
               </div>
 
