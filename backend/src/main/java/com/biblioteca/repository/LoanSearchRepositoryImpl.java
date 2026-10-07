@@ -9,7 +9,6 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Implementación de {@link LoanSearchRepository} (Spring Data la detecta por el sufijo
@@ -58,7 +57,8 @@ class LoanSearchRepositoryImpl implements LoanSearchRepository {
             case ALL -> { }
         }
         if (!query.text().isEmpty()) {
-            where.append(" and (lower(b.title) like :text escape '\\' or lower(m.name) like :text escape '\\')");
+            where.append(" and (").append(TextSearch.unaccented("b.title")).append(" like :text escape '\\' or ")
+                    .append(TextSearch.unaccented("m.name")).append(" like :text escape '\\')");
         }
         return where.toString();
     }
@@ -71,12 +71,7 @@ class LoanSearchRepositoryImpl implements LoanSearchRepository {
             q.setParameter("today", today);
         }
         if (!query.text().isEmpty()) {
-            q.setParameter("text", "%" + escapeLike(query.text().toLowerCase(Locale.ROOT)) + "%");
+            q.setParameter("text", TextSearch.containsPattern(query.text()));
         }
-    }
-
-    /** Trata % y _ escritos por el usuario como texto literal, no como comodines. */
-    private static String escapeLike(String text) {
-        return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }

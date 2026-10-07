@@ -87,7 +87,7 @@ const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text
             <div class="kpi-icon-wrap info"><app-icon name="users" [size]="24" /></div>
             <div class="kpi-data">
               <span class="kpi-val">{{ s.totalMembers }}</span>
-              <span class="kpi-label">Socios registrados</span>
+              <span class="kpi-label">Usuarios registrados</span>
             </div>
           </div>
 
@@ -444,7 +444,7 @@ export class StatsPage implements OnInit {
     if (!s) return [];
     return [
       { key: 'returned', label: 'Devueltos', count: s.returnedLoans, color: 'var(--chart-good)', icon: 'check' },
-      { key: 'onTime', label: 'Activos al día', count: s.activeLoans - s.overdueLoans, color: 'var(--chart-series)', icon: 'loans' },
+      { key: 'onTime', label: 'Activos al día', count: s.activeLoans, color: 'var(--chart-series)', icon: 'loans' },
       { key: 'overdue', label: 'Vencidos', count: s.overdueLoans, color: 'var(--chart-critical)', icon: 'alert' },
     ];
   });

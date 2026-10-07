@@ -56,4 +56,15 @@ describe('StatsPage', () => {
     expect(text).toContain('Ficción');
     expect(text).toContain('Ana Martínez');
   });
+
+  it('«Préstamos activos» y «Activos al día» muestran el mismo número (los vencidos van aparte)', async () => {
+    const fixture = create();
+    await fixture.whenStable();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const kpi = Array.from(root.querySelectorAll('.kpi-card')).find((c) => c.textContent?.includes('Préstamos activos'));
+    expect(kpi?.querySelector('.kpi-val')?.textContent?.trim()).toBe('7');
+    expect(root.textContent).toMatch(/Activos al día\s*7/);
+  });
+
 });
