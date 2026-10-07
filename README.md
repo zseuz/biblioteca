@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-146%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-158%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -468,7 +468,7 @@ flowchart TD
 
 - **Nuevo libro:** botón superior derecho. Todos los campos son obligatorios y debe haber al menos 1 ejemplar.
 - **Género literario:** es un selector con búsqueda, tanto al crear como al editar. Al hacer clic muestra los géneros sugeridos (Novela, Terror, Ciencia ficción…) más los que ya tienen los libros del catálogo; al escribir filtra, y si lo escrito no está en la lista aparece **«Añadir género …»** para usar uno nuevo (máx. 80 caracteres). Lo que escribas queda como valor aunque no elijas una opción; si coincide con uno existente (sin distinguir mayúsculas ni tildes) se usa su grafía.
-- **Buscar:** escribe en el buscador (título, autor o género). Combina la búsqueda con el filtro de género y con *Todos / Disponibles / Agotados*.
+- **Buscar:** escribe en el buscador (título, autor o género); no distingue mayúsculas ni **tildes** («garcia» encuentra «García»). Combina la búsqueda con el filtro de género y con *Todos / Disponibles / Agotados*.
 - **Ordenar:** haz clic en la cabecera de una columna.
 - **Vista:** alterna entre tabla y tarjetas con los iconos de la derecha.
 - **Libro repetido:** si registras un libro que ya existe (mismo título, autor y género), en lugar de duplicarlo se ofrece **sumar los ejemplares** que ibas a ingresar. Si solo cambia el género, se muestra la diferencia para que confirmes si es correcta o la corrijas.
@@ -483,7 +483,7 @@ flowchart TD
 ### Préstamos
 
 - **Registrar préstamo:** el usuario y el libro se eligen con un **buscador**: al hacer clic muestra todas las opciones y al escribir filtra sin importar mayúsculas ni tildes. Los usuarios se buscan por nombre o correo; los libros, por **título o autor**, y solo aparecen los que tienen ejemplares disponibles (con cuántos quedan).
-- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
+- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir; tampoco distingue tildes). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
 - **Orden:** por defecto se muestran primero los préstamos **más recientes** (fecha de préstamo descendente). Haz clic en la cabecera de una columna para ordenar por libro, usuario, fechas o estado; las fechas empiezan por la más reciente y un segundo clic invierte el orden.
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
 - **Préstamo repetido:** si el usuario ya tiene ese libro sin devolver, se avisa desde qué fecha lo tiene y se ofrecen tres opciones: *Cancelar*, *Renovar existente* o *Prestar otro ejemplar*. Si ese préstamo está vencido, solo se informa que debe devolverlo. El mismo aviso aparece en el préstamo rápido desde Libros. Mientras se muestra, la ventana de préstamo se oculta (no queda detrás) y reaparece con lo elegido si se cancela.
@@ -493,7 +493,7 @@ flowchart TD
 
 ### Estadísticas
 
-- **Indicadores:** títulos, usuarios, préstamos activos y vencidos (este último se resalta en rojo si hay alguno).
+- **Indicadores:** títulos, usuarios, préstamos activos y vencidos (este último se resalta en rojo si hay alguno). Igual que en Préstamos, *activos* son los que están **en plazo**; los vencidos se cuentan aparte.
 - **Gráficas:** pasa el ratón (o navega con Tab) para ver el detalle. Cada tarjeta tiene un botón **Gráfica / Tabla** con los mismos datos en formato tabla.
 - **Actualizar datos:** recarga el panel sin parpadeos.
 
@@ -540,7 +540,7 @@ URL base: `http://localhost:8080/api`
 
 | Método | Ruta | Descripción | Respuestas |
 |---|---|---|---|
-| `GET` | `/books?q=texto` | Lista o busca libros | 200 |
+| `GET` | `/books?q=texto` | Lista o busca libros (título, autor o género; sin distinguir mayúsculas ni tildes) | 200 |
 | `GET` | `/books/{id}` | Detalle de un libro | 200 · 404 |
 | `POST` | `/books` | Crea un libro (409 si ya existe el mismo título, autor y género) | 201 · 400 · 409 |
 | `PUT` | `/books/{id}` | Edita un libro | 200 · 400 · 404 · 409 |
@@ -558,14 +558,14 @@ URL base: `http://localhost:8080/api`
 | `POST` | `/loans/{id}/renew` | Renueva un préstamo en plazo cuando faltan 5 días o menos para vencer: vence 14 días después de hoy. Antes, 409 con la fecha desde la que se podrá | 200 · 404 · 409 |
 | `GET` | `/loans/{id}/renewals` | Historial: préstamo inicial y cada renovación con fecha, hora y vencimientos | 200 · 404 |
 | `POST` | `/loans/{id}/return` | Registra la devolución | 200 · 404 · 409 |
-| `GET` | `/stats` | Indicadores y series para las gráficas | 200 |
+| `GET` | `/stats` | Indicadores y series para las gráficas (`activeLoans` = en plazo, igual que `/loans/summary`) | 200 |
 
 **Parámetros del historial paginado** (`GET /loans`):
 
 | Parámetro | Valores | Por defecto |
 |---|---|---|
 | `status` | `ALL`, `ACTIVE` (en plazo), `OVERDUE` (vencido), `RETURNED` | `ALL` |
-| `q` | Texto en el título del libro o el nombre del usuario | — |
+| `q` | Texto en el título del libro o el nombre del usuario (sin distinguir mayúsculas ni tildes) | — |
 | `sort` | `bookTitle`, `memberName`, `loanDate`, `dueDate`, `status` | `loanDate` |
 | `direction` | `asc`, `desc` | `desc` sin `sort` (los préstamos más recientes primero); `asc` si se indica `sort` |
 | `page` | Número de página, desde 0 | `0` |
@@ -620,8 +620,8 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
-| Backend (65 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (81 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
+| Backend (69 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, búsquedas sin tildes, errores 400 por parámetros ausentes, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
+| Frontend (89 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador (sin tildes), paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 

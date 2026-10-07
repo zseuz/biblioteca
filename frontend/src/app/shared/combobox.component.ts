@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { normalizeText } from '../core/text';
 import { IconComponent, IconName } from './icon.component';
 
 /** Opción de un {@link ComboboxComponent}. */
@@ -28,10 +29,7 @@ type ViewOption<T> = ComboboxOption<T> & { isNew?: boolean };
 
 let nextId = 0;
 
-/** Normaliza para comparar sin distinguir mayúsculas ni tildes ("Pérez" coincide con "perez"). */
-function normalize(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-}
+const normalize = normalizeText; // sin mayúsculas ni tildes ("Pérez" coincide con "perez")
 
 /**
  * Campo de selección con búsqueda (patrón WAI-ARIA "combobox" con lista).

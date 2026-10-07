@@ -1,3 +1,5 @@
+import { normalizeText } from './text';
+
 /**
  * Géneros literarios sugeridos al crear o editar un libro. Son solo sugerencias: el campo también
  * admite escribir un género distinto, y los géneros que ya tengan los libros registrados se
@@ -41,10 +43,7 @@ export const COMMON_GENRES: readonly string[] = [
   'Viajes',
 ];
 
-/** Normaliza para comparar sin distinguir mayúsculas, tildes ni espacios sobrantes. */
-function normalize(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-}
+const normalize = normalizeText; // sin mayúsculas, tildes ni espacios sobrantes
 
 /**
  * Une los géneros sugeridos con los ya usados por los libros, sin repetir (aunque cambien

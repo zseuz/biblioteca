@@ -5,8 +5,9 @@ import java.util.List;
 /**
  * Panel de estadísticas.
  *
- * @param activeLoans   préstamos sin devolver (incluye los vencidos)
- * @param overdueLoans  préstamos activos cuya fecha límite ya pasó
+ * @param activeLoans   préstamos en plazo (sin devolver y con la fecha límite sin vencer); los vencidos
+ *                      se cuentan aparte, igual que en {@code /api/loans/summary}
+ * @param overdueLoans  préstamos sin devolver cuya fecha límite ya pasó
  * @param returnedLoans préstamos ya devueltos (histórico)
  * @param loansByMonth  préstamos iniciados en cada uno de los últimos meses, del más antiguo al
  *                      actual; {@code label} es el mes en formato ISO ({@code 2026-10}) y los
