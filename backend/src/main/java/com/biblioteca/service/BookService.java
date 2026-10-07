@@ -1,12 +1,14 @@
 package com.biblioteca.service;
 
 import com.biblioteca.domain.Book;
+import com.biblioteca.dto.BookDuplicateCheck;
 import com.biblioteca.dto.BookRequest;
 import com.biblioteca.dto.BookResponse;
 import com.biblioteca.exception.BusinessRuleException;
 import com.biblioteca.exception.NotFoundException;
 import com.biblioteca.repository.BookRepository;
 import com.biblioteca.repository.LoanRepository;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,9 +52,37 @@ public class BookService {
         return BookResponse.from(find(id));
     }
 
-    /** Da de alta un libro con todos sus ejemplares disponibles. */
+    /**
+     * Comprueba si un libro ya está registrado antes de crearlo (sin distinguir mayúsculas ni
+     * espacios sobrantes). Separa la coincidencia exacta de las que solo difieren en el género.
+     */
+    @Transactional(readOnly = true)
+    public BookDuplicateCheck checkDuplicates(String title, String author, String genre) {
+        String normalizedGenre = Book.normalize(genre);
+        BookResponse same = null;
+        List<BookResponse> otherGenres = new ArrayList<>();
+        for (Book b : books.findSameTitleAndAuthor(Book.normalize(title), Book.normalize(author))) {
+            if (same == null && b.getGenre().equalsIgnoreCase(normalizedGenre)) {
+                same = BookResponse.from(b);
+            } else {
+                otherGenres.add(BookResponse.from(b));
+            }
+        }
+        return new BookDuplicateCheck(same, otherGenres);
+    }
+
+    /**
+     * Da de alta un libro con todos sus ejemplares disponibles.
+     *
+     * @throws BusinessRuleException si ya existe un libro con el mismo título, autor y género
+     *                               (en ese caso se deben añadir ejemplares al existente)
+     */
     public BookResponse create(BookRequest r) {
-        Book book = books.save(new Book(r.title().trim(), r.author().trim(), r.genre().trim(), r.totalCopies()));
+        String title = Book.normalize(r.title());
+        String author = Book.normalize(r.author());
+        String genre = Book.normalize(r.genre());
+        ensureNotDuplicated(title, author, genre, null);
+        Book book = books.save(new Book(title, author, genre, r.totalCopies()));
         log.info("Libro creado id={} título='{}'", book.getId(), book.getTitle());
         return BookResponse.from(book);
     }
@@ -61,12 +91,41 @@ public class BookService {
      * Actualiza los datos de un libro conservando los ejemplares prestados.
      *
      * @throws NotFoundException     si el libro no existe
-     * @throws BusinessRuleException si el nuevo total es menor que los ejemplares prestados
+     * @throws BusinessRuleException si el nuevo total es menor que los ejemplares prestados o si
+     *                               los nuevos datos coinciden con otro libro ya registrado
      */
     public BookResponse update(Long id, BookRequest r) {
         Book book = find(id);
-        book.update(r.title().trim(), r.author().trim(), r.genre().trim(), r.totalCopies());
+        String title = Book.normalize(r.title());
+        String author = Book.normalize(r.author());
+        String genre = Book.normalize(r.genre());
+        ensureNotDuplicated(title, author, genre, id);
+        book.update(title, author, genre, r.totalCopies());
         return BookResponse.from(book); // dirty checking: Hibernate persiste el cambio al hacer commit
+    }
+
+    /**
+     * Añade ejemplares nuevos a un libro existente (todos quedan disponibles).
+     *
+     * @throws NotFoundException si el libro no existe
+     */
+    public BookResponse addCopies(Long id, int quantity) {
+        Book book = find(id);
+        book.addCopies(quantity);
+        log.info("Ejemplares añadidos libro id={} +{} (total {})", id, quantity, book.getTotalCopies());
+        return BookResponse.from(book);
+    }
+
+    /** Impide que haya dos libros con el mismo título, autor y género (sin distinguir mayúsculas). */
+    private void ensureNotDuplicated(String title, String author, String genre, Long excludeId) {
+        books.findSameTitleAndAuthor(title, author).stream()
+                .filter(b -> b.getGenre().equalsIgnoreCase(genre) && !b.getId().equals(excludeId))
+                .findFirst()
+                .ifPresent(existing -> {
+                    throw new BusinessRuleException("Ya existe «%s» de %s con el género «%s» (id %d). "
+                            .formatted(existing.getTitle(), existing.getAuthor(), existing.getGenre(), existing.getId())
+                            + "Añade ejemplares a ese libro en lugar de registrarlo otra vez.");
+                });
     }
 
     /**

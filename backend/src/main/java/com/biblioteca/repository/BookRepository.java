@@ -22,4 +22,15 @@ public interface BookRepository extends JpaRepository<Book, Long> {
             order by b.title
             """)
     List<Book> search(@Param("q") String q);
+
+    /**
+     * Libros con el mismo título y autor (sin distinguir mayúsculas), de cualquier género.
+     * Los valores llegan normalizados ({@link Book#normalize}), igual que se guardan.
+     */
+    @Query("""
+            select b from Book b
+            where lower(b.title) = lower(:title) and lower(b.author) = lower(:author)
+            order by b.id
+            """)
+    List<Book> findSameTitleAndAuthor(@Param("title") String title, @Param("author") String author);
 }

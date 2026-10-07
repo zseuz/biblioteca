@@ -146,6 +146,8 @@ import { IconComponent } from './icon.component';
     .modal-body {
       padding: 1.5rem;
       overflow-y: auto;
+      /* Sin esto el eje X también es "auto" y aparecen barras aunque el contenido quepa. */
+      overflow-x: hidden;
       flex: 1;
     }
 
