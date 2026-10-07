@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-96%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-97%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -44,7 +44,7 @@
 |---|---|
 | **Libros** | Alta, edición, baja y búsqueda por título, autor o género. Control de ejemplares totales y disponibles, filtros (disponibles / agotados), vista de tabla o tarjetas y préstamo rápido. **Detección de duplicados:** si el libro ya existe, ofrece sumar los ejemplares en vez de crear otro registro; si solo cambia el género, muestra la diferencia para confirmarla. |
 | **Usuarios** | Alta, edición y baja con validación del nombre y del correo (único). Los usuarios con préstamos no se pueden eliminar y la interfaz lo explica antes de intentarlo. |
-| **Préstamos** | Registro con buscador de usuarios, devolución, historial **paginado en el servidor** con filtros por estado, búsqueda y orden, y cálculo automático del vencimiento. |
+| **Préstamos** | Registro con buscador de usuarios y de libros (por título o autor), devolución, historial **paginado en el servidor** con filtros por estado, búsqueda y orden, y cálculo automático del vencimiento. |
 | **Estadísticas** | Indicadores clave y gráficas: préstamos por mes, estado de los préstamos, libros más prestados, préstamos por género y usuarios más activos. |
 
 Además: botones de guardar que **no cambian de tamaño** mientras cargan (el indicador solo aparece si la espera es perceptible), errores mostrados **en contexto** (junto al campo o dentro del diálogo), **tema claro / oscuro**, diseño **responsive** (escritorio, tableta y móvil) y accesibilidad (teclado, lectores de pantalla y vista de tabla para cada gráfica).
@@ -441,7 +441,7 @@ flowchart TD
 
 ### Préstamos
 
-- **Registrar préstamo:** el campo de usuario es un buscador. Al hacer clic muestra a todos los usuarios y al escribir filtra por nombre o correo, sin importar mayúsculas ni tildes.
+- **Registrar préstamo:** el usuario y el libro se eligen con un **buscador**: al hacer clic muestra todas las opciones y al escribir filtra sin importar mayúsculas ni tildes. Los usuarios se buscan por nombre o correo; los libros, por **título o autor**, y solo aparecen los que tienen ejemplares disponibles (con cuántos quedan).
 - **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
 - **Ordenar:** haz clic en la cabecera de una columna (libro, usuario, fechas o estado).
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
@@ -570,7 +570,7 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
 | Backend (45 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (51 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado y estados de carga de los botones |
+| Frontend (52 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 

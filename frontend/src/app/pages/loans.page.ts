@@ -344,19 +344,15 @@ export type SortOrder = 'asc' | 'desc';
 
           <div class="form-group">
             <label for="book">Libro a prestar *</label>
-            <select
-              id="book"
+            <app-combobox
+              inputId="book"
               formControlName="bookId"
-              [class.invalid]="invalid('bookId')"
-              [attr.aria-invalid]="invalid('bookId')"
-            >
-              <option value="">Selecciona un libro...</option>
-              @for (b of availableBooks(); track b.id) {
-                <option [value]="b.id">
-                  {{ b.title }} — {{ b.author }} ({{ b.availableCopies }} disponibles)
-                </option>
-              }
-            </select>
+              icon="book"
+              [options]="bookOptions()"
+              [invalid]="invalid('bookId')"
+              placeholder="Escribe el título o el autor, o despliega la lista..."
+              emptyText="Ningún libro disponible coincide con la búsqueda"
+            />
             @if (invalid('bookId')) {
               <p class="error"><app-icon name="alert" [size]="13" /> Selecciona un libro.</p>
             }
@@ -642,6 +638,18 @@ export class LoansPage implements OnInit {
   /** Usuarios como opciones del buscador (el valor es el id en texto, igual que el formulario). */
   readonly memberOptions = computed<ComboboxOption<string>[]>(() =>
     this.members().map((m) => ({ value: String(m.id), label: m.name, description: m.email })),
+  );
+
+  /**
+   * Libros con ejemplares disponibles como opciones del buscador. El autor va en la descripción,
+   * así también se puede buscar por autor.
+   */
+  readonly bookOptions = computed<ComboboxOption<string>[]>(() =>
+    this.availableBooks().map((b) => ({
+      value: String(b.id),
+      label: b.title,
+      description: `${b.author} · ${b.availableCopies} ${b.availableCopies === 1 ? 'disponible' : 'disponibles'}`,
+    })),
   );
 
   readonly form = this.fb.group({
