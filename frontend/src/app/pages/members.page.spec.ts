@@ -2,6 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { API_URL } from '../core/api.service';
+import { SILENT_ERRORS } from '../core/error.interceptor';
+import { NotifyService } from '../core/notify.service';
 import { MembersPage } from './members.page';
 
 describe('MembersPage', () => {
@@ -146,6 +148,48 @@ describe('MembersPage', () => {
       expect(fixture.componentInstance.deleting()).toBe(false);
       expect(document.querySelector('.confirm-error')?.textContent).toContain('historial de préstamos');
     });
+  });
+
+  it('si el correo ya existe, lo indica junto al campo y no con un aviso flotante', async () => {
+    const fixture = create();
+    fixture.componentInstance.openCreate();
+    fixture.componentInstance.form.setValue({ name: 'Carlos Ruiz', email: 'carlos@example.com' });
+    fixture.componentInstance.save();
+
+    const req = http.expectOne((r) => r.method === 'POST' && r.url === `${API_URL}/members`);
+    expect(req.request.context.get(SILENT_ERRORS)).toBe(true);
+    req.flush(
+      { status: 409, message: 'Ya existe un usuario con ese correo' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await fixture.whenStable();
+
+    const email = fixture.componentInstance.form.controls.email;
+    expect(email.hasError('taken')).toBe(true);
+    expect(document.body.textContent).toContain('Ya existe un usuario con ese correo.');
+    expect(fixture.componentInstance.isModalOpen()).toBe(true); // el formulario sigue abierto
+    expect(fixture.componentInstance.saving()).toBe(false);
+    expect(TestBed.inject(NotifyService).notice()).toBeNull();
+
+    // Al corregir el correo, el error desaparece.
+    email.setValue('carlos.ruiz@example.com');
+    expect(email.hasError('taken')).toBe(false);
+  });
+
+  it('el botón de guardar conserva su ancho mientras guarda', async () => {
+    const fixture = create();
+    fixture.componentInstance.openCreate();
+    fixture.componentInstance.form.setValue({ name: 'Laura Gómez', email: 'laura@example.com' });
+    fixture.componentInstance.save();
+    await fixture.whenStable();
+
+    const button = document.querySelector<HTMLButtonElement>('button[form="member-form"]')!;
+    expect(button.classList).toContain('is-loading');
+    expect(button.querySelector('.btn-label')?.textContent?.trim()).toBe('Agregar usuario');
+    expect(button.querySelector('.btn-spinner')).not.toBeNull();
+
+    http.expectOne((r) => r.method === 'POST').flush({ id: 9, name: 'Laura Gómez', email: 'laura@example.com' });
+    http.expectOne(`${API_URL}/members`).flush([]);
   });
 
   it('crea el usuario cuando el formulario es válido', () => {

@@ -373,11 +373,11 @@ export type SortOrder = 'asc' | 'desc';
         >
           Cancelar
         </button>
-        <button type="submit" form="loan-form" class="btn btn-primary" [disabled]="saving()">
+        <button type="submit" form="loan-form" class="btn btn-primary" [disabled]="saving()" [class.is-loading]="saving()" [attr.aria-busy]="saving()">
+          <span class="btn-label">Prestar libro</span>
           @if (saving()) {
-            <span class="spinner-sm"></span>
+            <span class="spinner-sm btn-spinner" aria-hidden="true"></span>
           }
-          Prestar libro
         </button>
       </div>
     </app-modal>
