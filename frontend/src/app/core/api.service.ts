@@ -4,6 +4,7 @@ import { Observable, map } from 'rxjs';
 import { SILENT_ERRORS } from './error.interceptor';
 import {
   Book,
+  BookDuplicateCheck,
   BookInput,
   Loan,
   LoanQueryParams,
@@ -34,6 +35,18 @@ export class ApiService {
     return this.http.put<Book>(`${API_URL}/books/${id}`, book);
   }
   /** El error (p. ej. 409 por historial) lo muestra el diálogo de confirmación, no el aviso global. */
+  /** Comprueba si el libro ya está registrado (sin distinguir mayúsculas ni espacios). */
+  checkBookDuplicates(book: Pick<BookInput, 'title' | 'author' | 'genre'>): Observable<BookDuplicateCheck> {
+    const params = new HttpParams()
+      .set('title', book.title)
+      .set('author', book.author)
+      .set('genre', book.genre);
+    return this.http.get<BookDuplicateCheck>(`${API_URL}/books/duplicates`, { params });
+  }
+  /** Añade ejemplares disponibles a un libro existente. */
+  addCopies(id: number, quantity: number): Observable<Book> {
+    return this.http.post<Book>(`${API_URL}/books/${id}/copies`, { quantity });
+  }
   deleteBook(id: number): Observable<void> {
     return this.http.delete<void>(`${API_URL}/books/${id}`, { context: silentErrors() });
   }
