@@ -17,11 +17,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import com.biblioteca.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -30,10 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>Los préstamos se crean directamente con fechas pasadas (la API siempre usa la fecha de hoy),
  * para tener a la vez préstamos activos, vencidos y devueltos con fechas distintas y predecibles.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class LoanSearchIntegrationTest {
+class LoanSearchIntegrationTest extends IntegrationTest {
 
     @Autowired
     private MockMvc mvc;
