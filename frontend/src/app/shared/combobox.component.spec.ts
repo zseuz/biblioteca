@@ -89,4 +89,124 @@ describe('ComboboxComponent', () => {
 
     expect(fixture.componentInstance.control.value).toBeNull();
   });
+
+  describe('con allowCustom (se puede escribir un valor nuevo)', () => {
+    @Component({
+      imports: [ComboboxComponent, ReactiveFormsModule],
+      template: `<app-combobox
+        inputId="genre"
+        [formControl]="control"
+        [options]="options"
+        [allowCustom]="true"
+        [maxlength]="20"
+        newOptionLabel="Añadir género"
+      />`,
+    })
+    class GenreHost {
+      readonly control = new FormControl<string>('', { nonNullable: true });
+      readonly options: ComboboxOption<string>[] = [
+        { value: 'Novela', label: 'Novela' },
+        { value: 'Novela negra', label: 'Novela negra' },
+        { value: 'Terror', label: 'Terror' },
+      ];
+    }
+
+    async function setupGenre() {
+      const fixture = TestBed.createComponent(GenreHost);
+      await fixture.whenStable();
+      const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#genre')!;
+      const type = async (text: string) => {
+        input.value = text;
+        input.dispatchEvent(new Event('input'));
+        await fixture.whenStable();
+      };
+      const blur = async () => {
+        input.dispatchEvent(new FocusEvent('blur'));
+        await fixture.whenStable();
+      };
+      return { fixture, input, type, blur };
+    }
+
+    it('al hacer clic muestra todas las sugerencias, sin fila «Añadir»', async () => {
+      const { fixture, input } = await setupGenre();
+      input.dispatchEvent(new Event('click'));
+      await fixture.whenStable();
+
+      expect(labels()).toEqual(['Novela', 'Novela negra', 'Terror']);
+    });
+
+    it('ofrece añadir lo escrito cuando no está en la lista y lo usa como valor', async () => {
+      const { fixture, input, type } = await setupGenre();
+      await type('Realismo sucio');
+
+      expect(labels()).toEqual(['Añadir género «Realismo sucio»']);
+      expect(fixture.componentInstance.control.value).toBe('Realismo sucio'); // ya es el valor
+      expect(input.getAttribute('maxlength')).toBe('20');
+
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      await fixture.whenStable();
+      expect(fixture.componentInstance.control.value).toBe('Realismo sucio');
+      expect(input.value).toBe('Realismo sucio');
+    });
+
+    it('no ofrece añadir si lo escrito coincide con una opción (sin distinguir tildes ni mayúsculas)', async () => {
+      const { type } = await setupGenre();
+      await type('novela');
+      expect(labels()).toEqual(['Novela', 'Novela negra']); // sin «Añadir»
+
+      await type('novela hist');
+      expect(labels()).toEqual(['Añadir género «novela hist»']);
+    });
+
+    it('Enter elige la primera sugerencia; la fila «Añadir» queda al final', async () => {
+      const { fixture, input, type } = await setupGenre();
+      await type('nov');
+      expect(labels()).toEqual(['Novela', 'Novela negra', 'Añadir género «nov»']);
+
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      await fixture.whenStable();
+      expect(fixture.componentInstance.control.value).toBe('Novela');
+    });
+
+    it('al salir, el texto escrito queda como valor y respeta la grafía de la opción existente', async () => {
+      const { fixture, input, type, blur } = await setupGenre();
+      await type('Poesía épica');
+      await blur();
+      expect(fixture.componentInstance.control.value).toBe('Poesía épica');
+      expect(input.value).toBe('Poesía épica');
+
+      await type('terror');
+      await blur();
+      expect(fixture.componentInstance.control.value).toBe('Terror'); // grafía de la lista
+      expect(input.value).toBe('Terror');
+    });
+
+    it('elegir con el ratón una sugerencia no deja el texto parcial como valor', async () => {
+      const { fixture, input, type } = await setupGenre();
+      await type('ter');
+      (document.querySelector('.combo-option') as HTMLElement).click();
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.control.value).toBe('Terror');
+      expect(input.value).toBe('Terror');
+    });
+
+    it('borrar el texto deja el valor vacío (cadena vacía, no null)', async () => {
+      const { fixture, type } = await setupGenre();
+      fixture.componentInstance.control.setValue('Terror');
+      await fixture.whenStable();
+
+      await type('');
+      expect(fixture.componentInstance.control.value).toBe('');
+    });
+
+    it('muestra un valor que no está en la lista (p. ej. al editar un libro)', async () => {
+      const { fixture, input } = await setupGenre();
+      fixture.componentInstance.control.setValue('Cyberpunk');
+      await fixture.whenStable();
+
+      expect(input.value).toBe('Cyberpunk');
+    });
+  });
+
 });
