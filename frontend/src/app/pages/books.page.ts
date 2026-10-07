@@ -11,9 +11,10 @@ import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angu
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
-import { Book, Member } from '../core/models';
+import { Book, BookInput, Member } from '../core/models';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
+import { BookDuplicate, BookDuplicateDialogComponent } from './book-duplicate-dialog.component';
 import { ComboboxComponent, ComboboxOption } from '../shared/combobox.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
@@ -31,6 +32,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
     ReactiveFormsModule,
     IconComponent,
     ActionMenuComponent,
+    BookDuplicateDialogComponent,
     ComboboxComponent,
     ModalComponent,
     ConfirmDialogComponent,
@@ -436,6 +438,15 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       </div>
     </app-modal>
 
+    <!-- Aviso de libro ya registrado (antes de crear) -->
+    <app-book-duplicate-dialog
+      [duplicate]="duplicate()"
+      [busy]="saving()"
+      (addCopies)="addToExisting()"
+      (createAnyway)="confirmNewGenre()"
+      (back)="backToForm()"
+    />
+
     <!-- Modal de Confirmación de Eliminación -->
     <app-confirm-dialog
       [open]="deleteDialogOpen()"
@@ -780,6 +791,11 @@ export class BooksPage implements OnInit {
   readonly deleteDialogOpen = signal(false);
   readonly bookToDelete = signal<Book | null>(null);
   readonly deleting = signal(false);
+  /**
+   * Libro ya registrado detectado al crear: o el mismo (se ofrece sumar ejemplares) o con el
+   * mismo título y autor pero otro género (se muestra la diferencia para confirmar).
+   */
+  readonly duplicate = signal<BookDuplicate | null>(null);
   /** Motivo por el que el servidor rechazó la baja (p. ej. historial); se ve dentro del diálogo. */
   readonly deleteError = signal<string | null>(null);
 
@@ -950,6 +966,63 @@ export class BooksPage implements OnInit {
       return;
     }
     const value = this.form.getRawValue();
+    if (this.editing()) {
+      this.persist(value);
+      return;
+    }
+    // Alta: antes de crear se comprueba si el libro ya existe.
+    this.saving.set(true);
+    this.api.checkBookDuplicates(value).subscribe({
+      next: ({ sameBook, differentGenre }) => {
+        this.saving.set(false);
+        if (sameBook) {
+          this.duplicate.set({ kind: 'same', existing: sameBook, draft: value });
+        } else if (differentGenre.length > 0) {
+          this.duplicate.set({ kind: 'genre', existing: differentGenre, draft: value });
+        } else {
+          this.persist(value);
+        }
+      },
+      error: () => this.saving.set(false),
+    });
+  }
+
+  /** Suma los ejemplares del formulario al libro que ya estaba registrado. */
+  addToExisting(): void {
+    const dup = this.duplicate();
+    if (dup?.kind !== 'same') return;
+    this.saving.set(true);
+    this.api.addCopies(dup.existing.id, dup.draft.totalCopies).subscribe({
+      next: (book) => {
+        const n = dup.draft.totalCopies;
+        this.notify.ok(
+          `Se ${n === 1 ? 'añadió 1 ejemplar' : 'añadieron ' + n + ' ejemplares'} a «${book.title}». ` +
+            `Ahora tiene ${book.totalCopies}.`,
+        );
+        this.duplicate.set(null);
+        this.saving.set(false);
+        this.cancel();
+        this.load();
+      },
+      error: () => this.saving.set(false),
+    });
+  }
+
+  /** El usuario confirma que el género distinto es correcto: se crea el libro nuevo. */
+  confirmNewGenre(): void {
+    const dup = this.duplicate();
+    if (dup?.kind !== 'genre') return;
+    this.duplicate.set(null);
+    this.persist(dup.draft);
+  }
+
+  /** Cierra el aviso y deja el formulario abierto, con lo escrito, para corregirlo. */
+  backToForm(): void {
+    this.duplicate.set(null);
+    setTimeout(() => document.getElementById('genre')?.focus(), 50);
+  }
+
+  private persist(value: BookInput): void {
     const current = this.editing();
     const request = current ? this.api.updateBook(current.id, value) : this.api.createBook(value);
     this.saving.set(true);
