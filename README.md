@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-158%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-174%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -453,7 +453,7 @@ flowchart TD
     B -- Sí --> E1["Error: obligatorio"]
     B -- No --> C{"¿Más de 100 caracteres?"}
     C -- Sí --> E2["Error: máximo 100<br/>(el HTML no deja escribir más)"]
-    C -- No --> D{"¿Tiene números o<br/>un solo carácter?"}
+    C -- No --> D{"¿Tiene números o<br/>1 o 2 caracteres?"}
     D -- Sí --> W["Aviso + confirmación<br/>«¿El nombre es correcto?»"]
     D -- No --> OK["Se guarda"]
     W -- "Sí, registrar" --> OK
@@ -466,7 +466,7 @@ flowchart TD
 
 ### Libros
 
-- **Nuevo libro:** botón superior derecho. Todos los campos son obligatorios y debe haber al menos 1 ejemplar.
+- **Nuevo libro:** botón superior derecho. Todos los campos son obligatorios, con un mínimo y un máximo de caracteres (ver [límites de los formularios](#límites-de-los-formularios)) y entre 1 y 1000 ejemplares. Título y autor muestran un contador (p. ej. *900/200* en rojo) y cada error dice exactamente qué falla: vacío, demasiado corto o demasiado largo.
 - **Género literario:** es un selector con búsqueda, tanto al crear como al editar. Al hacer clic muestra los géneros sugeridos (Novela, Terror, Ciencia ficción…) más los que ya tienen los libros del catálogo; al escribir filtra, y si lo escrito no está en la lista aparece **«Añadir género …»** para usar uno nuevo (máx. 80 caracteres). Lo que escribas queda como valor aunque no elijas una opción; si coincide con uno existente (sin distinguir mayúsculas ni tildes) se usa su grafía.
 - **Buscar:** escribe en el buscador (título, autor o género); no distingue mayúsculas ni **tildes** («garcia» encuentra «García»). Combina la búsqueda con el filtro de género y con *Todos / Disponibles / Agotados*.
 - **Ordenar:** haz clic en la cabecera de una columna.
@@ -476,8 +476,8 @@ flowchart TD
 
 ### Usuarios
 
-- **Nuevo usuario:** nombre (máx. 100 caracteres, con contador) y correo válido y único. Si el correo ya está registrado, se indica **junto al campo** (que recibe el foco) sin cerrar el formulario.
-- Si el nombre contiene **números** o tiene **un solo carácter**, aparece un aviso y se pide confirmación antes de guardarlo.
+- **Nuevo usuario:** nombre (máx. 100 caracteres, con contador) y correo válido y único, de 6 a 150 caracteres. Si el correo ya está registrado, se indica **junto al campo** (que recibe el foco) sin cerrar el formulario.
+- Si el nombre contiene **números** o tiene **1 o 2 caracteres**, aparece un aviso y se pide confirmación antes de guardarlo.
 - **Eliminar:** si el usuario tiene préstamos, se explica por qué no es posible, sin intentarlo.
 
 ### Préstamos
@@ -522,6 +522,20 @@ flowchart TD
 - No se puede reducir el total de ejemplares de un libro por debajo de los que están prestados.
 - El correo de un usuario es único (sin distinguir mayúsculas).
 
+### Límites de los formularios
+
+Se validan en la web (con mensajes concretos) y otra vez en la API, que responde `400` con el motivo de cada campo. Los textos se cuentan **sin los espacios del inicio y del final**.
+
+| Formulario | Campo | Obligatorio | Mínimo | Máximo |
+|---|---|---|---|---|
+| Libro | Título | Sí | 2 caracteres | 200 caracteres |
+| Libro | Autor | Sí | 3 caracteres | 150 caracteres |
+| Libro | Género | Sí | 3 caracteres | 80 caracteres |
+| Libro | Ejemplares | Sí | 1 | 1000 (solo números enteros) |
+| Usuario | Nombre | Sí | — (con 1 o 2 caracteres se pide confirmación) | 100 caracteres |
+| Usuario | Correo | Sí, con formato válido | 6 caracteres | 150 caracteres |
+| Préstamo | Usuario y libro | Sí (se eligen de una lista) | — | — |
+
 ### Validación del nombre de usuario (en las tres capas)
 
 | Capa | Regla |
@@ -530,7 +544,7 @@ flowchart TD
 | Angular | `required`, sin solo espacios y `maxLength(100)`, con contador de caracteres |
 | Backend | `@NotBlank` y `@Size(max = 100)` → `400` con el mensaje del campo |
 
-Los nombres con números o de un solo carácter **no se bloquean** (pueden ser legítimos): la interfaz avisa y pide confirmación.
+Los nombres con números o de 1 o 2 caracteres **no se bloquean** (pueden ser legítimos): la interfaz avisa y pide confirmación.
 
 ---
 
@@ -620,8 +634,8 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
-| Backend (69 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, búsquedas sin tildes, errores 400 por parámetros ausentes, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (89 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador (sin tildes), paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
+| Backend (71 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, búsquedas sin tildes, errores 400 por parámetros ausentes, longitudes mínimas y máximas de cada campo, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (ventana de 5 días, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
+| Frontend (103 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones (obligatorio, mínimo y máximo de cada campo), menú de acciones, buscador (sin tildes), paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones, selector de género y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
