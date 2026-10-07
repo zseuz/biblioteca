@@ -697,8 +697,9 @@ export class LoansPage implements OnInit {
   // Filtros
   readonly searchTerm = signal('');
   readonly statusFilter = signal<LoanFilterStatus>('ALL');
-  readonly sortField = signal<LoanSortField>('dueDate');
-  readonly sortOrder = signal<SortOrder>('asc');
+  /** Por defecto, los préstamos más recientes primero. */
+  readonly sortField = signal<LoanSortField>('loanDate');
+  readonly sortOrder = signal<SortOrder>('desc');
   readonly page = signal(0);
   readonly pageSize = signal(10);
   /** Texto de búsqueda ya aplicado (se actualiza 300 ms después de dejar de escribir). */
@@ -873,7 +874,8 @@ export class LoansPage implements OnInit {
       this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
     } else {
       this.sortField.set(field);
-      this.sortOrder.set('asc');
+      // Las fechas empiezan por la más reciente; los textos, de la A a la Z.
+      this.sortOrder.set(field === 'loanDate' || field === 'dueDate' ? 'desc' : 'asc');
     }
     this.page.set(0);
   }

@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-119%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-120%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -401,7 +401,7 @@ sequenceDiagram
 
     U->>W: Cambia filtro, orden o página, o escribe en el buscador
     Note over W: La búsqueda espera 300 ms sin teclear.<br/>Una consulta nueva cancela la anterior (switchMap).
-    W->>API: GET /api/loans?status=OVERDUE&q=&sort=dueDate&direction=asc&page=0&size=10
+    W->>API: GET /api/loans?status=OVERDUE&q=&sort=loanDate&direction=desc&page=0&size=10
     API->>API: Valida status, sort y direction (400 si no son válidos)
     API->>DB: Datos de la página (join fetch) y total
     DB-->>API: 10 filas + total de coincidencias
@@ -480,7 +480,7 @@ flowchart TD
 
 - **Registrar préstamo:** el usuario y el libro se eligen con un **buscador**: al hacer clic muestra todas las opciones y al escribir filtra sin importar mayúsculas ni tildes. Los usuarios se buscan por nombre o correo; los libros, por **título o autor**, y solo aparecen los que tienen ejemplares disponibles (con cuántos quedan).
 - **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir). *Activos* son los que están **en plazo**; los que pasaron su fecha límite aparecen en *Vencidos*.
-- **Ordenar:** haz clic en la cabecera de una columna (libro, usuario, fechas o estado).
+- **Orden:** por defecto se muestran primero los préstamos **más recientes** (fecha de préstamo descendente). Haz clic en la cabecera de una columna para ordenar por libro, usuario, fechas o estado; las fechas empiezan por la más reciente y un segundo clic invierte el orden.
 - **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
 - **Préstamo repetido:** si el usuario ya tiene ese libro sin devolver, se avisa desde qué fecha lo tiene y se ofrecen tres opciones: *Cancelar*, *Renovar existente* o *Prestar otro ejemplar*. Si ese préstamo está vencido, solo se informa que debe devolverlo. El mismo aviso aparece en el préstamo rápido desde Libros.
 - **Renovar:** menú ⋮ → *Renovar (14 días desde hoy)*, solo en préstamos **en plazo**. Tras confirmar, la nueva fecha límite se muestra en el aviso y la tabla indica cuántas veces se ha renovado. Si ya se renovó hoy (o se prestó hoy), en lugar de la confirmación aparece un aviso con la hora de la renovación y desde cuándo podrá renovarse.
@@ -561,8 +561,8 @@ URL base: `http://localhost:8080/api`
 |---|---|---|
 | `status` | `ALL`, `ACTIVE` (en plazo), `OVERDUE` (vencido), `RETURNED` | `ALL` |
 | `q` | Texto en el título del libro o el nombre del usuario | — |
-| `sort` | `bookTitle`, `memberName`, `loanDate`, `dueDate`, `status` | `dueDate` |
-| `direction` | `asc`, `desc` | `asc` |
+| `sort` | `bookTitle`, `memberName`, `loanDate`, `dueDate`, `status` | `loanDate` |
+| `direction` | `asc`, `desc` | `desc` sin `sort` (los préstamos más recientes primero); `asc` si se indica `sort` |
 | `page` | Número de página, desde 0 | `0` |
 | `size` | Elementos por página (se acota entre 1 y 100) | `10` |
 
@@ -616,7 +616,7 @@ La documentación se genera a partir del propio código (controladores, DTOs y v
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
 | Backend (60 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas), detección de libros duplicados, renovación (una por día, historial) y préstamo repetido, y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
-| Frontend (59 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones y estados de carga de los botones |
+| Frontend (60 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador, consultas al servidor, aviso de libro duplicado, aviso de préstamo repetido, renovación, historial de renovaciones y estados de carga de los botones |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 

@@ -29,6 +29,9 @@ public record LoanQuery(StatusFilter status, String text, SortField sort, boolea
     /**
      * Construye los criterios a partir de los parámetros HTTP (texto libre).
      *
+     * <p>Sin {@code sort} se ordena por fecha de préstamo, del más reciente al más antiguo. Si se
+     * indica {@code sort} sin {@code direction}, el sentido es ascendente.
+     *
      * @throws BadRequestException si el estado, el campo de orden o el sentido no son válidos
      */
     public static LoanQuery fromParams(String status, String text, String sort, String direction, int page, int size) {
@@ -36,13 +39,16 @@ public record LoanQuery(StatusFilter status, String text, SortField sort, boolea
                 StatusFilter.parse(status),
                 text,
                 SortField.parse(sort),
-                parseAscending(direction),
+                parseAscending(direction, sort == null || sort.isBlank()),
                 page,
                 size);
     }
 
-    private static boolean parseAscending(String direction) {
-        return switch (direction == null ? "asc" : direction.toLowerCase(Locale.ROOT)) {
+    private static boolean parseAscending(String direction, boolean defaultSort) {
+        if (direction == null || direction.isBlank()) {
+            return !defaultSort; // orden por defecto: los más recientes primero
+        }
+        return switch (direction.toLowerCase(Locale.ROOT)) {
             case "asc" -> true;
             case "desc" -> false;
             default -> throw new BadRequestException("direction debe ser 'asc' o 'desc'");
@@ -88,7 +94,7 @@ public record LoanQuery(StatusFilter status, String text, SortField sort, boolea
         }
 
         static SortField parse(String value) {
-            if (value == null || value.isBlank()) return DUE_DATE;
+            if (value == null || value.isBlank()) return LOAN_DATE;
             return Arrays.stream(values())
                     .filter(f -> f.param.equals(value.trim()))
                     .findFirst()
