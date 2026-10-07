@@ -17,10 +17,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.AfterEach;
+import com.biblioteca.IntegrationTest;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 /**
@@ -35,8 +34,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
  * <p>Se repite varias veces porque el orden de los hilos no es determinista: en todas las
  * repeticiones debe cumplirse lo mismo.
  */
-@SpringBootTest
-class LoanConcurrencyTest {
+class LoanConcurrencyTest extends IntegrationTest {
 
     private static final int THREADS = 10;
 
@@ -49,12 +47,6 @@ class LoanConcurrencyTest {
     @Autowired
     private LoanRepository loans;
 
-    @AfterEach
-    void cleanUp() {
-        loans.deleteAll();
-        books.deleteAll();
-        members.deleteAll();
-    }
 
     @RepeatedTest(5)
     void onlyOneOfManySimultaneousLoansGetsTheLastCopy() throws Exception {
