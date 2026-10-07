@@ -10,7 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
 ![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
-![Tests](https://img.shields.io/badge/tests-59%20en%20verde-success)
+![Tests](https://img.shields.io/badge/tests-83%20en%20verde-success)
 
 <img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
@@ -30,7 +30,7 @@
 8. [Cómo funciona (diagramas)](#cómo-funciona-diagramas)
 9. [Guía de uso por pantalla](#guía-de-uso-por-pantalla)
 10. [Reglas de negocio y validaciones](#reglas-de-negocio-y-validaciones)
-11. [API REST](#api-rest)
+11. [API REST](#api-rest) · [Swagger](#documentación-interactiva-swagger)
 12. [Pruebas automatizadas](#pruebas-automatizadas)
 13. [Estructura del proyecto](#estructura-del-proyecto)
 14. [Configuración](#configuración)
@@ -45,7 +45,7 @@
 |---|---|
 | **Libros** | Alta, edición, baja y búsqueda por título, autor o género. Control de ejemplares totales y disponibles, filtros (disponibles / agotados), vista de tabla o tarjetas y préstamo rápido. |
 | **Usuarios** | Alta, edición y baja con validación del nombre y del correo (único). Los usuarios con préstamos no se pueden eliminar y la interfaz lo explica antes de intentarlo. |
-| **Préstamos** | Registro con buscador de usuarios, devolución, filtros por estado (activos, vencidos, devueltos) y cálculo automático del vencimiento. |
+| **Préstamos** | Registro con buscador de usuarios, devolución, historial **paginado en el servidor** con filtros por estado, búsqueda y orden, y cálculo automático del vencimiento. |
 | **Estadísticas** | Indicadores clave y gráficas: préstamos por mes, estado de los préstamos, libros más prestados, préstamos por género y usuarios más activos. |
 
 Además: **tema claro / oscuro**, diseño **responsive** (escritorio, tableta y móvil) y accesibilidad (teclado, lectores de pantalla y vista de tabla para cada gráfica).
@@ -196,6 +196,7 @@ Pulsa `Ctrl + C` en cada una de las dos terminales.
 |---|---|---|
 | El backend está vivo | Abrir http://localhost:8080/actuator/health | `{"status":"UP", ...}` |
 | La API responde | Abrir http://localhost:8080/api/books | Lista de libros en JSON |
+| Documentación de la API | Abrir http://localhost:8080/swagger-ui.html | Swagger UI con todos los endpoints |
 | El frontend se conecta | Abrir http://localhost:4200 | Catálogo con 8 libros |
 | Registros de prueba | Filtro **Agotados** en Libros y **Vencidos** en Préstamos | «1984» agotado y «Rayuela» vencido |
 
@@ -385,7 +386,8 @@ flowchart TD
 ### Préstamos
 
 - **Registrar préstamo:** el campo de usuario es un buscador. Al hacer clic muestra a todos los usuarios y al escribir filtra por nombre o correo, sin importar mayúsculas ni tildes.
-- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario.
+- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario (se aplica al dejar de escribir).
+- **Paginación:** abajo de la tabla se indica *Mostrando 11–20 de 21*, con botones de página y selector de 10, 20 o 50 por página. Filtros, búsqueda, orden y páginas se resuelven en el servidor.
 - **Devolver:** menú ⋮ → *Registrar devolución* (solo en préstamos activos o vencidos).
 
 ### Estadísticas
@@ -440,10 +442,34 @@ URL base: `http://localhost:8080/api`
 | `POST` | `/members` | Crea un usuario | 201 · 400 · 409 |
 | `PUT` | `/members/{id}` | Edita un usuario | 200 · 400 · 404 · 409 |
 | `DELETE` | `/members/{id}` | Elimina un usuario sin historial | 204 · 404 · 409 |
-| `GET` | `/loans` | Historial (estado `ACTIVE`, `OVERDUE` o `RETURNED`) | 200 |
+| `GET` | `/loans?status=&q=&sort=&direction=&page=&size=` | Historial **paginado** (ver tabla de parámetros) | 200 · 400 |
+| `GET` | `/loans/summary` | Contadores: total, activos, vencidos y devueltos | 200 |
 | `POST` | `/loans` | Presta un libro `{bookId, memberId}` | 201 · 400 · 404 · 409 |
 | `POST` | `/loans/{id}/return` | Registra la devolución | 200 · 404 · 409 |
 | `GET` | `/stats` | Indicadores y series para las gráficas | 200 |
+
+**Parámetros del historial paginado** (`GET /loans`):
+
+| Parámetro | Valores | Por defecto |
+|---|---|---|
+| `status` | `ALL`, `ACTIVE` (en plazo), `OVERDUE` (vencido), `RETURNED` | `ALL` |
+| `q` | Texto en el título del libro o el nombre del usuario | — |
+| `sort` | `bookTitle`, `memberName`, `loanDate`, `dueDate`, `status` | `dueDate` |
+| `direction` | `asc`, `desc` | `asc` |
+| `page` | Número de página, desde 0 | `0` |
+| `size` | Elementos por página (se acota entre 1 y 100) | `10` |
+
+Respuesta:
+
+```json
+{
+  "content": [ { "id": 7, "bookTitle": "Rayuela", "memberName": "Usuario de Prueba", "status": "OVERDUE", "...": "..." } ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 21,
+  "totalPages": 3
+}
+```
 
 **Ejemplo — crear un usuario:**
 
@@ -470,14 +496,20 @@ curl -X POST http://localhost:8080/api/members -H "Content-Type: application/jso
 | `409` | Se incumple una regla de negocio o hubo un conflicto de concurrencia |
 | `500` | Error inesperado (mensaje genérico; el detalle queda en el log del servidor) |
 
+### Documentación interactiva (Swagger)
+
+Con el backend en marcha, abre **http://localhost:8080/swagger-ui.html**. Ahí verás todos los endpoints agrupados (Libros, Usuarios, Préstamos, Estadísticas), con sus parámetros, los modelos de datos y los posibles errores, y podrás **probarlos desde el navegador** con *Try it out*. La especificación OpenAPI en JSON está en http://localhost:8080/v3/api-docs.
+
+La documentación se genera a partir del propio código (controladores, DTOs y validaciones), así que siempre está sincronizada con la API.
+
 ---
 
 ## Pruebas automatizadas
 
 | Proyecto | Comando | Qué cubre |
 |---|---|---|
-| Backend (23 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo y pruebas de integración HTTP → JPA → H2 |
-| Frontend (36 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones y buscador |
+| Backend (38 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo, integración HTTP → JPA → H2, historial paginado (filtros, búsqueda, orden, páginas) y **concurrencia real** (10 hilos compitiendo por el último ejemplar) |
+| Frontend (45 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones, buscador, paginador y consultas al servidor |
 
 Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
@@ -551,11 +583,13 @@ La URL de la API que usa el frontend está en `frontend/src/app/core/api.service
 
 - **Arquitectura en capas** (controlador → servicio → repositorio) con **DTOs**: las entidades nunca salen de la transacción, así que no hay errores de carga perezosa ni consultas ocultas.
 - **Sin N+1:** el historial se carga con `join fetch`, y los contadores por usuario y las estadísticas se agregan en la base de datos con una sola consulta.
-- **Concurrencia segura:** bloqueo optimista (`@Version`) en libros y préstamos. Dos préstamos simultáneos del último ejemplar terminan en `409`, nunca en stock negativo.
+- **Concurrencia segura:** bloqueo optimista (`@Version`) en libros y préstamos. Dos préstamos simultáneos del último ejemplar terminan en `409`, nunca en stock negativo. Lo verifica un test con 10 hilos simultáneos; como prueba de control, sin `@Version` ese test falla.
+- **Historial paginado en el servidor:** filtros, búsqueda y orden en una consulta JPQL con `join fetch` y desempate por id (paginación estable). El orden se elige de una lista blanca y el texto va siempre como parámetro, así que no hay riesgo de inyección. El frontend cancela las peticiones obsoletas (`switchMap`) y aplica la búsqueda al dejar de escribir.
 - **Índices** en las columnas que usan las reglas y los informes.
 - **Reloj inyectado (`Clock`)** para probar fechas de forma determinista.
 - **Errores uniformes** y sin filtrar detalles internos; los `500` se registran con la traza completa en el log.
 - **Operación:** `/actuator/health` con *probes*, apagado ordenado y compresión de respuestas JSON.
+- **API documentada con OpenAPI (Swagger UI)**, generada desde el código, con un esquema común para los errores (`ApiError`).
 - **Frontend:** componentes standalone con `OnPush` y signals, carga diferida por ruta, interceptor de errores, gráficas propias en SVG (sin librerías) con una paleta validada para daltonismo y contraste, y diseño accesible (teclado, `aria-*`, vista de tabla para las gráficas).
 
-**Siguientes pasos para producción:** migraciones con Flyway, PostgreSQL, paginación del historial, autenticación (Spring Security + JWT) y documentación OpenAPI.
+**Fuera del alcance de esta prueba (decisión consciente):** autenticación (Spring Security), una base de datos de servidor (se mantiene H2 para que funcione sin instalar nada) y migraciones versionadas con Flyway. Serían los siguientes pasos para llevarlo a producción.
