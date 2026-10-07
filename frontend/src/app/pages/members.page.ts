@@ -14,6 +14,7 @@ import { messageFor } from '../core/error.interceptor';
 import { normalizeText } from '../core/text';
 import { Member } from '../core/models';
 import { NAME_MAX, nameWarnings, notBlank } from '../core/member-name';
+import { LIMITS, textLength, validationMessage } from '../core/validators';
 import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
@@ -291,11 +292,7 @@ export type SortOrder = 'asc' | 'desc';
             @if (invalid('email')) {
               <p class="error" role="alert">
                 <app-icon name="alert" [size]="13" />
-                {{
-                  form.controls.email.hasError('taken')
-                    ? 'Ya existe un usuario con ese correo. Usa otro o busca al usuario en la lista.'
-                    : 'Ingresa un correo válido.'
-                }}
+                {{ emailError() }}
               </p>
             }
           </div>
@@ -573,8 +570,11 @@ export class MembersPage implements OnInit {
   protected readonly nameMax = NAME_MAX;
 
   readonly form = this.fb.group({
-    name: ['', [Validators.required, notBlank, Validators.maxLength(NAME_MAX)]],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(150)]],
+    name: ['', [Validators.required, notBlank, textLength(LIMITS.memberName.min, NAME_MAX)]],
+    email: [
+      '',
+      [Validators.required, notBlank, Validators.email, textLength(LIMITS.email.min, LIMITS.email.max)],
+    ],
   });
 
   /** Valor del nombre como signal, para recalcular contador y avisos al escribir (OnPush). */
@@ -682,12 +682,18 @@ export class MembersPage implements OnInit {
     setTimeout(() => document.getElementById('name')?.focus());
   }
 
-  /** Mensaje del error de validación del nombre (prioridad: vacío > solo espacios > largo). */
+  /** Mensaje del error de validación del nombre (vacío, solo espacios o demasiado largo). */
   protected nameError(): string {
-    const errors = this.form.controls.name.errors ?? {};
-    if (errors['required'] || errors['blank']) return 'El nombre es obligatorio.';
-    if (errors['maxlength']) return `El nombre no puede superar los ${NAME_MAX} caracteres.`;
-    return 'El nombre no es válido.';
+    return validationMessage('El nombre', this.form.controls.name.errors);
+  }
+
+  /** Mensaje del error del correo; el correo repetido lo detecta el servidor. */
+  protected emailError(): string {
+    const control = this.form.controls.email;
+    if (control.hasError('taken')) {
+      return 'Ya existe un usuario con ese correo. Usa otro o busca al usuario en la lista.';
+    }
+    return validationMessage('El correo', control.errors);
   }
 
   private persist(): void {
