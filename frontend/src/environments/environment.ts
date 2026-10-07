@@ -6,5 +6,5 @@
  */
 export const environment = {
   production: true,
-  apiUrl: 'https://biblioteca-api.onrender.com/api',
+  apiUrl: 'https://biblioteca-api-se8r.onrender.com/api',
 };
