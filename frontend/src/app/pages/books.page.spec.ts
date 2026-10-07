@@ -56,17 +56,6 @@ describe('BooksPage', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Dune');
   });
 
-  it('no envía el formulario si hay campos obligatorios vacíos', () => {
-    const fixture = create();
-    fixture.componentInstance.save();
-    fixture.detectChanges();
-
-    http.expectNone(isDuplicateCheck);
-    http.expectNone((r) => r.method === 'POST');
-    expect(fixture.componentInstance.form.invalid).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('El título es obligatorio.');
-  });
-
   it('comprueba duplicados y, si no hay, crea el libro', () => {
     const fixture = create();
     fixture.componentInstance.openCreate();
@@ -318,10 +307,16 @@ describe('BooksPage', () => {
       ]);
     });
 
-    it('distingue los campos vacíos', async () => {
-      await fill({ title: '', author: '   ', genre: '', totalCopies: 1 });
+    it('distingue los campos vacíos y no envía el formulario', async () => {
+      const fixture = await fill({ title: '', author: '   ', genre: '', totalCopies: 1 });
 
       expect(errors()).toEqual(['El título es obligatorio.', 'El autor es obligatorio.', 'El género es obligatorio.']);
+
+      // Con errores, guardar no consulta duplicados ni crea nada.
+      fixture.componentInstance.save();
+      http.expectNone(isDuplicateCheck);
+      http.expectNone((r) => r.method === 'POST');
+      expect(fixture.componentInstance.form.invalid).toBe(true);
     });
 
     it('valida el número de ejemplares: mínimo, máximo y enteros', async () => {

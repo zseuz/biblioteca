@@ -107,9 +107,12 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.totalElements", is(4)));
     }
 
-    /** Búsqueda por título del libro o nombre del usuario, combinable con el filtro de estado. */
+    /**
+     * Búsqueda por título del libro o nombre del usuario: sin distinguir mayúsculas ni tildes,
+     * combinable con el estado, y con «%» y «_» tratados como texto.
+     */
     @Test
-    void searchesByBookTitleOrMemberNameIgnoringCase() throws Exception {
+    void searchesByBookTitleOrMemberName() throws Exception {
         mvc.perform(get("/api/loans").param("q", "libro 03"))
                 .andExpect(jsonPath("$.totalElements", is(1)))
                 .andExpect(jsonPath("$.content[0].bookTitle", is("Libro 03")));
@@ -118,17 +121,19 @@ class LoanSearchIntegrationTest extends IntegrationTest {
         // Combinado con el estado: Bruno tiene 2 vencidos (7, 8) y 4 devueltos.
         mvc.perform(get("/api/loans").param("q", "bruno").param("status", "OVERDUE"))
                 .andExpect(jsonPath("$.totalElements", is(2)));
-    }
 
-    /** La búsqueda ignora tildes en lo escrito y en los datos. */
-    @Test
-    void searchIgnoresAccentsInBothDirections() throws Exception {
+        // Tildes: Bruno Díaz se encuentra con o sin tilde y en mayúsculas.
         // Bruno Díaz tiene 6 préstamos: se encuentra con o sin tilde y en mayúsculas.
         mvc.perform(get("/api/loans").param("q", "diaz")).andExpect(jsonPath("$.totalElements", is(6)));
         mvc.perform(get("/api/loans").param("q", "DÍAZ")).andExpect(jsonPath("$.totalElements", is(6)));
         mvc.perform(get("/api/loans").param("q", "díaz")).andExpect(jsonPath("$.totalElements", is(6)));
         mvc.perform(get("/api/loans").param("q", "dias")).andExpect(jsonPath("$.totalElements", is(0)));
+
+        // «%» y «_» se buscan como texto, no como comodines de SQL.
+        mvc.perform(get("/api/loans").param("q", "%")).andExpect(jsonPath("$.totalElements", is(0)));
+        mvc.perform(get("/api/loans").param("q", "_")).andExpect(jsonPath("$.totalElements", is(0)));
     }
+
 
     /** Las estadísticas cuentan como activos solo los préstamos en plazo, igual que el resumen. */
     @Test
@@ -141,12 +146,6 @@ class LoanSearchIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.returnedLoans", is(4)));
     }
 
-    /** «%» y «_» se buscan como texto, no como comodines de SQL. */
-    @Test
-    void wildcardCharactersAreSearchedLiterally() throws Exception {
-        mvc.perform(get("/api/loans").param("q", "%")).andExpect(jsonPath("$.totalElements", is(0)));
-        mvc.perform(get("/api/loans").param("q", "_")).andExpect(jsonPath("$.totalElements", is(0)));
-    }
 
     /** Ordena por las columnas permitidas en ambos sentidos. */
     @Test
