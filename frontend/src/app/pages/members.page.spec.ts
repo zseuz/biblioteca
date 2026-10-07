@@ -206,4 +206,20 @@ describe('MembersPage', () => {
     req.flush({ id: 2, name: 'Laura Gómez', email: 'laura@example.com' });
     http.expectOne(`${API_URL}/members`).flush([]);
   });
+
+  it('la búsqueda ignora mayúsculas y tildes', async () => {
+    const fixture = create();
+    fixture.componentInstance.members.set([
+      { id: 1, name: 'Bruno Díaz', email: 'bruno@example.com', activeLoans: 0, totalLoans: 0 },
+      { id: 2, name: 'María Gómez', email: 'maria@example.com', activeLoans: 0, totalLoans: 0 },
+    ]);
+
+    fixture.componentInstance.searchTerm.set('diaz');
+    expect(fixture.componentInstance.filteredMembers().map((m) => m.name)).toEqual(['Bruno Díaz']);
+    fixture.componentInstance.searchTerm.set('GÓMEZ');
+    expect(fixture.componentInstance.filteredMembers().map((m) => m.name)).toEqual(['María Gómez']);
+    fixture.componentInstance.searchTerm.set('gomez');
+    expect(fixture.componentInstance.filteredMembers().map((m) => m.name)).toEqual(['María Gómez']);
+  });
+
 });

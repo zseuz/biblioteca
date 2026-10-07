@@ -8,23 +8,26 @@ import org.springframework.data.repository.query.Param;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
 
-    /**
-     * Búsqueda parcial e insensible a mayúsculas en título, autor y género.
-     *
-     * @param q texto ya recortado; cadena vacía devuelve todo el catálogo
-     */
-    @Query("""
-            select b from Book b
-            where :q = ''
-               or lower(b.title) like lower(concat('%', :q, '%'))
-               or lower(b.author) like lower(concat('%', :q, '%'))
-               or lower(b.genre) like lower(concat('%', :q, '%'))
-            order by b.title
-            """)
-    List<Book> search(@Param("q") String q);
+    // Columnas en minÃºscula y sin tildes (constantes: se usan dentro de la anotaciÃ³n @Query).
+    String TITLE = "cast(function('translate', lower(b.title), '" + TextSearch.ACCENTS + "', '" + TextSearch.PLAIN + "') as string)";
+    String AUTHOR = "cast(function('translate', lower(b.author), '" + TextSearch.ACCENTS + "', '" + TextSearch.PLAIN + "') as string)";
+    String GENRE = "cast(function('translate', lower(b.genre), '" + TextSearch.ACCENTS + "', '" + TextSearch.PLAIN + "') as string)";
 
     /**
-     * Libros con el mismo título y autor (sin distinguir mayúsculas), de cualquier género.
+     * BÃºsqueda parcial en tÃ­tulo, autor y gÃ©nero, sin distinguir mayÃºsculas ni tildes.
+     *
+     * @param pattern patrÃ³n {@code LIKE} ya normalizado ({@link TextSearch#containsPattern}); si
+     *                {@code all} es verdadero se ignora y se devuelve todo el catÃ¡logo
+     */
+    @Query("select b from Book b where :all = true"
+            + " or " + TITLE + " like :pattern escape '\\'"
+            + " or " + AUTHOR + " like :pattern escape '\\'"
+            + " or " + GENRE + " like :pattern escape '\\'"
+            + " order by b.title")
+    List<Book> search(@Param("all") boolean all, @Param("pattern") String pattern);
+
+    /**
+     * Libros con el mismo tÃ­tulo y autor (sin distinguir mayÃºsculas), de cualquier gÃ©nero.
      * Los valores llegan normalizados ({@link Book#normalize}), igual que se guardan.
      */
     @Query("""

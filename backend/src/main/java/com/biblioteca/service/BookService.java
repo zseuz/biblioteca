@@ -8,6 +8,7 @@ import com.biblioteca.exception.BusinessRuleException;
 import com.biblioteca.exception.NotFoundException;
 import com.biblioteca.repository.BookRepository;
 import com.biblioteca.repository.LoanRepository;
+import com.biblioteca.repository.TextSearch;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -35,11 +36,11 @@ public class BookService {
         this.loans = loans;
     }
 
-    /** Busca por título, autor o género (sin distinguir mayúsculas). Vacío o nulo devuelve todo. */
+    /** Busca por título, autor o género (sin distinguir mayúsculas ni tildes). Vacío o nulo devuelve todo. */
     @Transactional(readOnly = true)
     public List<BookResponse> search(String query) {
         String q = query == null ? "" : query.trim();
-        return books.search(q).stream().map(BookResponse::from).toList();
+        return books.search(q.isEmpty(), TextSearch.containsPattern(q)).stream().map(BookResponse::from).toList();
     }
 
     /**

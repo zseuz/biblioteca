@@ -44,11 +44,12 @@ public class StatsService {
 
     public StatsResponse compute() {
         LocalDate today = LocalDate.now(clock);
+        long overdue = loans.countByReturnDateIsNullAndDueDateBefore(today);
         return new StatsResponse(
                 books.count(),
                 members.count(),
-                loans.countByReturnDateIsNull(),
-                loans.countByReturnDateIsNullAndDueDateBefore(today),
+                loans.countByReturnDateIsNull() - overdue, // activos = en plazo, sin contar los vencidos
+                overdue,
                 loans.countByReturnDateIsNotNull(),
                 loansByMonth(YearMonth.from(today)),
                 loans.topBooks(TOP),
