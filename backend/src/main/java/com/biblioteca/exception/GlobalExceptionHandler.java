@@ -36,6 +36,11 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    ResponseEntity<ApiError> badRequest(BadRequestException ex, HttpServletRequest req) {
+        return body(HttpStatus.BAD_REQUEST, ex.getMessage(), req, null);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     ResponseEntity<ApiError> businessRule(BusinessRuleException ex, HttpServletRequest req) {
         log.debug("Regla de negocio rechazada en {}: {}", req.getRequestURI(), ex.getMessage());
