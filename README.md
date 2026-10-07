@@ -157,6 +157,14 @@ Started BibliotecaApplication in ... seconds
 
 > La primera vez tarda unos minutos porque descarga Maven y las dependencias. **Deja esta terminal abierta.**
 
+#### Alternativa: arrancar el backend desde un IDE (NetBeans, IntelliJ, VS Code)
+
+1. Abre la carpeta **`backend`** como proyecto Maven (en NetBeans: *File → Open Project* y elige `backend`).
+2. Espera a que el IDE descargue las dependencias.
+3. Pulsa **Run** (▶). La clase principal es `com.biblioteca.BibliotecaApplication`; también puedes ejecutar directamente ese archivo.
+
+> Si ya tienes el backend corriendo en una terminal, deténlo antes (`Ctrl + C`): dos instancias no pueden usar el puerto 8080 a la vez.
+
 ### Paso 2 — Frontend (Terminal 2)
 
 Abre **otra** terminal en la carpeta del proyecto y entra en el frontend:
@@ -625,6 +633,8 @@ La URL de la API que usa el frontend está en `frontend/src/app/core/api.service
 | `release version 21 not supported` | JDK anterior a 21 | Instala JDK 21 o superior y comprueba `java -version` |
 | `./mvnw: Permission denied` (macOS/Linux) | El script no es ejecutable | `chmod +x mvnw` |
 | `Port 8080 was already in use` | Otra instancia del backend sigue abierta | Ciérrala o cambia el puerto con `SERVER_PORT=8081` (y `API_URL` en el frontend) |
+| NetBeans: `Could not find or load main class ${start-class}` | Versión del proyecto anterior a la corrección | Actualiza el repositorio (`git pull`): el `pom.xml` ya define la clase principal |
+| Swagger o endpoints nuevos devuelven 404 | El backend que está corriendo es una versión anterior | Detén el backend y arráncalo de nuevo con el código actual |
 | `npm install` falla o `ng` exige otra versión de Node | Node antiguo | Instala Node 22.22+ LTS o 24.15+ |
 | La web dice *"No se pudo conectar con el servidor"* | El backend no está arrancado | Arranca el backend (Terminal 1) y recarga la página |
 | Error de CORS en la consola del navegador | El frontend usa otro puerto u origen | Ajusta `CORS_ALLOWED_ORIGINS` |
