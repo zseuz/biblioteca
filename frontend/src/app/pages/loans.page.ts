@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
@@ -13,6 +14,7 @@ import { ApiService } from '../core/api.service';
 import {
   Book,
   Loan,
+  LoanRenewalHistory,
   LoanQueryParams,
   LoanStatus,
   LoanSummary,
@@ -23,6 +25,8 @@ import { NotifyService } from '../core/notify.service';
 import { ActionMenuComponent, ActionMenuItem } from '../shared/action-menu.component';
 import { PaginatorComponent } from '../shared/paginator.component';
 import { LoanRepeat, LoanRepeatDialogComponent } from './loan-repeat-dialog.component';
+import { LoanRenewalsDialogComponent } from './loan-renewals-dialog.component';
+import { messageFor } from '../core/error.interceptor';
 import { ComboboxComponent, ComboboxOption } from '../shared/combobox.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
@@ -42,6 +46,7 @@ export type SortOrder = 'asc' | 'desc';
     ActionMenuComponent,
     PaginatorComponent,
     LoanRepeatDialogComponent,
+    LoanRenewalsDialogComponent,
     ComboboxComponent,
     ModalComponent,
     ConfirmDialogComponent,
@@ -261,9 +266,16 @@ export type SortOrder = 'asc' | 'desc';
                         </span>
                       }
                       @if (l.renewals) {
-                        <span class="due-subtext" [title]="'Última renovación: ' + formatDate(l.lastRenewedOn ?? '')">
+                        <button
+                          type="button"
+                          class="renewals-link"
+                          (click)="openHistory(l)"
+                          [attr.aria-label]="'Ver historial de renovaciones de ' + l.bookTitle"
+                          title="Ver historial de renovaciones"
+                        >
+                          <app-icon name="history" [size]="13" />
                           Renovado {{ l.renewals === 1 ? '1 vez' : l.renewals + ' veces' }}
-                        </span>
+                        </button>
                       }
                     </div>
                   </td>
@@ -385,24 +397,31 @@ export type SortOrder = 'asc' | 'desc';
       </div>
     </app-modal>
 
-    <!-- Confirmación de renovación -->
+    <!-- Confirmación de renovación (o aviso si hoy ya no se puede renovar) -->
     <app-confirm-dialog
       [open]="!!loanToRenew()"
-      title="Renovar préstamo"
+      [title]="renewBlocked() ? 'No se puede renovar' : 'Renovar préstamo'"
       [message]="
+        renewBlocked() ??
         '¿Renovar el préstamo de ' +
-        (loanToRenew()?.bookTitle ?? '') +
-        ' a ' +
-        (loanToRenew()?.memberName ?? '') +
-        '? Vencerá 14 días después de hoy.'
+          (loanToRenew()?.bookTitle ?? '') +
+          ' a ' +
+          (loanToRenew()?.memberName ?? '') +
+          '? Vencerá 14 días después de hoy.'
       "
       [emphasis]="loanToRenew()?.bookTitle ?? ''"
       confirmText="Renovar"
+      [cancelText]="renewBlocked() ? 'Entendido' : 'Cancelar'"
+      [showConfirm]="!renewBlocked()"
       variant="primary"
       [loading]="renewing()"
+      [error]="renewError()"
       (confirm)="confirmRenew()"
       (cancel)="loanToRenew.set(null)"
     />
+
+    <!-- Historial de renovaciones -->
+    <app-loan-renewals-dialog [loan]="historyLoan()" [history]="history()" (close)="historyLoan.set(null)" />
 
     <!-- Aviso: el usuario ya tiene este libro sin devolver -->
     <app-loan-repeat-dialog
@@ -598,6 +617,29 @@ export type SortOrder = 'asc' | 'desc';
       font-size: 0.75rem;
       color: var(--muted);
     }
+    .renewals-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      width: fit-content;
+      margin-top: 0.1rem;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--primary);
+      font: inherit;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .renewals-link:hover {
+      text-decoration: underline;
+    }
+    .renewals-link:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
     .due-subtext.sub-danger {
       color: var(--danger);
       font-weight: 600;
@@ -678,6 +720,20 @@ export class LoansPage implements OnInit {
   /** Préstamo que se va a renovar (diálogo de confirmación). */
   readonly loanToRenew = signal<Loan | null>(null);
   readonly renewing = signal(false);
+  /** Motivo por el que falló la renovación (se muestra dentro del diálogo). */
+  readonly renewError = signal<string | null>(null);
+  /**
+   * Si hoy no se puede renovar el préstamo elegido, el motivo; el diálogo pasa a ser
+   * informativo. El servidor aplica la misma regla.
+   */
+  readonly renewBlocked = computed(() => {
+    const loan = this.loanToRenew();
+    return loan ? this.renewBlockedReason(loan) : null;
+  });
+
+  /** Préstamo cuyo historial de renovaciones se está viendo, y el historial cargado. */
+  readonly historyLoan = signal<Loan | null>(null);
+  readonly history = signal<LoanRenewalHistory | null>(null);
   /** Aviso de préstamo repetido (el usuario ya tiene ese libro sin devolver). */
   readonly repeat = signal<LoanRepeat | null>(null);
 
@@ -916,22 +972,62 @@ export class LoansPage implements OnInit {
 
   /** Abre la confirmación de renovación desde el menú ⋮. */
   promptRenew(loan: Loan): void {
+    this.renewError.set(null);
     this.loanToRenew.set(loan);
   }
 
   confirmRenew(): void {
     const loan = this.loanToRenew();
-    if (!loan) return;
+    if (!loan || this.renewBlocked()) return;
+    this.renewError.set(null);
     this.renewing.set(true);
-    this.api.renewLoan(loan.id).subscribe({
+    this.api.renewLoan(loan.id, true).subscribe({
       next: (renewed) => {
         this.renewing.set(false);
         this.loanToRenew.set(null);
         this.notifyRenewed(renewed);
         this.load();
       },
-      error: () => this.renewing.set(false),
+      error: (err: HttpErrorResponse) => {
+        this.renewing.set(false);
+        this.renewError.set(messageFor(err));
+      },
     });
+  }
+
+  /**
+   * Un préstamo se renueva como mucho una vez al día, y uno registrado hoy ya tiene el plazo
+   * completo. Devuelve el motivo para informarlo sin llamar al servidor, o {@code null}.
+   */
+  private renewBlockedReason(loan: Loan): string | null {
+    const today = this.todayIso();
+    const due = this.formatDate(loan.dueDate);
+    if (loan.lastRenewedOn === today) {
+      const at = loan.lastRenewedAt ? ` a las ${loan.lastRenewedAt.slice(11, 16)}` : '';
+      return `El préstamo de ${loan.bookTitle} ya se renovó hoy${at} y vence el ${due}. Podrá renovarse de nuevo a partir de mañana.`;
+    }
+    if (loan.loanDate === today) {
+      return `El préstamo de ${loan.bookTitle} se registró hoy y ya tiene el plazo completo (vence el ${due}). Podrá renovarse a partir de mañana.`;
+    }
+    return null;
+  }
+
+  /** Abre el historial de renovaciones (préstamo inicial y cada renovación). */
+  openHistory(loan: Loan): void {
+    this.history.set(null);
+    this.historyLoan.set(loan);
+    this.api.renewalHistory(loan.id).subscribe({
+      next: (h) => {
+        if (this.historyLoan()?.id === loan.id) this.history.set(h);
+      },
+      error: () => this.historyLoan.set(null),
+    });
+  }
+
+  /** Fecha local de hoy en formato ISO ("2026-10-07"). */
+  private todayIso(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   private notifyRenewed(loan: Loan): void {

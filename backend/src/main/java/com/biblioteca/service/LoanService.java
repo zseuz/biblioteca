@@ -3,8 +3,10 @@ package com.biblioteca.service;
 import com.biblioteca.config.LibraryProperties;
 import com.biblioteca.domain.Book;
 import com.biblioteca.domain.Loan;
+import com.biblioteca.domain.LoanRenewal;
 import com.biblioteca.domain.Member;
 import com.biblioteca.dto.LoanQuery;
+import com.biblioteca.dto.LoanRenewalHistory;
 import com.biblioteca.dto.LoanRequest;
 import com.biblioteca.dto.LoanResponse;
 import com.biblioteca.dto.LoanSummary;
@@ -16,6 +18,9 @@ import com.biblioteca.repository.LoanRepository;
 import com.biblioteca.repository.MemberRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,16 +88,54 @@ public class LoanService {
      * Renueva un préstamo en plazo: vuelve a tener el plazo completo contando desde hoy.
      *
      * @throws NotFoundException     si el préstamo no existe
-     * @throws BusinessRuleException si ya fue devuelto, está vencido o ya tiene el plazo completo
+     * @throws BusinessRuleException si ya fue devuelto, está vencido, ya se renovó hoy o ya tiene
+     *                               el plazo completo
      */
     public LoanResponse renew(Long loanId) {
-        Loan loan = loans.findByIdWithDetails(loanId)
-                .orElseThrow(() -> new NotFoundException("Préstamo no encontrado: " + loanId));
-        LocalDate today = today();
-        loan.renew(today, rules.days());
+        Loan loan = findWithDetails(loanId);
+        LocalDateTime now = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS);
+        loan.renew(now, rules.days());
         log.info("Renovación préstamo id={} nuevo vencimiento={} (renovación nº {})",
                 loanId, loan.getDueDate(), loan.getRenewals());
-        return LoanResponse.from(loan, today);
+        return LoanResponse.from(loan, now.toLocalDate());
+    }
+
+    /**
+     * Historial de renovaciones con los datos del préstamo inicial.
+     *
+     * <p>Los préstamos renovados antes de existir el historial tienen renovaciones sin detalle
+     * ({@code unrecordedRenewals}); en ese caso el vencimiento original se deduce del plazo.
+     *
+     * @throws NotFoundException si el préstamo no existe
+     */
+    @Transactional(readOnly = true)
+    public LoanRenewalHistory renewalHistory(Long loanId) {
+        Loan loan = findWithDetails(loanId);
+        List<LoanRenewal> history = loan.getRenewalHistory();
+        int unrecorded = Math.max(0, loan.getRenewals() - history.size());
+
+        LocalDate originalDueDate;
+        if (unrecorded > 0) {
+            originalDueDate = loan.getLoanDate().plusDays(rules.days());
+        } else if (history.isEmpty()) {
+            originalDueDate = loan.getDueDate();
+        } else {
+            originalDueDate = history.getFirst().getPreviousDueDate();
+        }
+
+        List<LoanRenewalHistory.Entry> entries = new ArrayList<>(history.size());
+        for (int i = 0; i < history.size(); i++) {
+            LoanRenewal r = history.get(i);
+            entries.add(new LoanRenewalHistory.Entry(unrecorded + i + 1, r.getRenewedAt(),
+                    r.getPreviousDueDate(), r.getNewDueDate(),
+                    ChronoUnit.DAYS.between(r.getPreviousDueDate(), r.getNewDueDate())));
+        }
+        return new LoanRenewalHistory(LoanResponse.from(loan, today()), originalDueDate, entries, unrecorded);
+    }
+
+    private Loan findWithDetails(Long loanId) {
+        return loans.findByIdWithDetails(loanId)
+                .orElseThrow(() -> new NotFoundException("Préstamo no encontrado: " + loanId));
     }
 
     /** Contadores por estado para las pestañas e indicadores. */

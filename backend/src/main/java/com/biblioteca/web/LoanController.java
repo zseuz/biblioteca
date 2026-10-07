@@ -1,6 +1,7 @@
 package com.biblioteca.web;
 
 import com.biblioteca.dto.LoanQuery;
+import com.biblioteca.dto.LoanRenewalHistory;
 import com.biblioteca.dto.LoanRequest;
 import com.biblioteca.dto.LoanResponse;
 import com.biblioteca.dto.LoanSummary;
@@ -74,14 +75,24 @@ public class LoanController {
 
     @Operation(summary = "Renovar un préstamo",
             description = "Solo préstamos en plazo: la fecha límite pasa a ser hoy + el plazo configurado (14 días). "
-                    + "Se registra el número de renovaciones.")
+                    + "Cada renovación queda en el historial con su fecha y hora. Se permite una renovación por día.")
     @ApiResponse(responseCode = "200", description = "Préstamo renovado")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @ApiResponse(responseCode = "409", description = "Ya devuelto, vencido o ya con el plazo completo",
+    @ApiResponse(responseCode = "409", description = "Ya devuelto, vencido, ya renovado hoy o ya con el plazo completo",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/{id}/renew")
     public LoanResponse renew(@PathVariable Long id) {
         return service.renew(id);
+    }
+
+    @Operation(summary = "Historial de renovaciones",
+            description = "Datos del préstamo inicial (fecha y vencimiento original) y cada renovación: "
+                    + "fecha y hora, vencimiento anterior y nuevo.")
+    @ApiResponse(responseCode = "200", description = "Historial")
+    @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @GetMapping("/{id}/renewals")
+    public LoanRenewalHistory renewals(@PathVariable Long id) {
+        return service.renewalHistory(id);
     }
 
     @Operation(summary = "Contadores por estado",

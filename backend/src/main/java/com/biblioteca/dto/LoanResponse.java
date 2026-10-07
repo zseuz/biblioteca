@@ -2,6 +2,7 @@ package com.biblioteca.dto;
 
 import com.biblioteca.domain.Loan;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Representación pública de un préstamo. Incluye el título del libro y el nombre del
@@ -11,10 +12,11 @@ import java.time.LocalDate;
  * @param status     {@code ACTIVE}, {@code OVERDUE} (activo y fuera de plazo) o {@code RETURNED}
  * @param renewals   veces que se renovó (cada renovación vuelve a dar el plazo completo desde ese día)
  * @param lastRenewedOn fecha de la última renovación ({@code null} si nunca se renovó)
+ * @param lastRenewedAt fecha y hora de la última renovación (puede faltar en renovaciones antiguas)
  */
 public record LoanResponse(Long id, Long bookId, String bookTitle, Long memberId, String memberName,
                            LocalDate loanDate, LocalDate dueDate, LocalDate returnDate, String status,
-                           int renewals, LocalDate lastRenewedOn) {
+                           int renewals, LocalDate lastRenewedOn, LocalDateTime lastRenewedAt) {
 
     /**
      * Convierte la entidad en DTO calculando su estado respecto a {@code today}.
@@ -27,6 +29,6 @@ public record LoanResponse(Long id, Long bookId, String bookTitle, Long memberId
         return new LoanResponse(l.getId(), l.getBook().getId(), l.getBook().getTitle(),
                 l.getMember().getId(), l.getMember().getName(),
                 l.getLoanDate(), l.getDueDate(), l.getReturnDate(), status,
-                l.getRenewals(), l.getLastRenewedOn());
+                l.getRenewals(), l.getLastRenewedOn(), l.getLastRenewedAt());
     }
 }
