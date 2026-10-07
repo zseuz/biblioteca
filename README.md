@@ -1,150 +1,561 @@
+<div align="center">
+
+<img src="frontend/public/favicon.svg" width="72" alt="Logo de Biblioteca" />
+
 # Sistema de Biblioteca
 
-Prueba técnica JR Developer: CRUD de libros, gestión de préstamos y estadísticas.
+**Gestión de libros, usuarios y préstamos con reglas de negocio y panel de estadísticas.**
 
-- **Backend:** Spring Boot 4 (Java 21+), Spring Data JPA, H2 (archivo local), Bean Validation.
-- **Frontend:** Angular 22 (standalone components, signals, formularios reactivos).
+![Java](https://img.shields.io/badge/Java-21%2B-orange?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
+![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
+![H2](https://img.shields.io/badge/Base%20de%20datos-H2-1E3A8A)
+![Tests](https://img.shields.io/badge/tests-59%20en%20verde-success)
 
-## Cómo ejecutarlo
+<img src="docs/img/estadisticas.jpg" alt="Panel de estadísticas" width="820" />
 
-Requisitos: JDK 21+ y Node 20+. No hace falta instalar Maven ni una base de datos.
+</div>
+
+---
+
+## Índice
+
+1. [¿Qué hace la aplicación?](#qué-hace-la-aplicación)
+2. [Capturas](#capturas)
+3. [Requisitos previos](#requisitos-previos)
+4. [Descargar el proyecto](#descargar-el-proyecto)
+5. [Ponerlo en marcha paso a paso](#ponerlo-en-marcha-paso-a-paso)
+6. [Comprobar que todo funciona](#comprobar-que-todo-funciona)
+7. [Datos de ejemplo y registros de prueba](#datos-de-ejemplo-y-registros-de-prueba)
+8. [Cómo funciona (diagramas)](#cómo-funciona-diagramas)
+9. [Guía de uso por pantalla](#guía-de-uso-por-pantalla)
+10. [Reglas de negocio y validaciones](#reglas-de-negocio-y-validaciones)
+11. [API REST](#api-rest)
+12. [Pruebas automatizadas](#pruebas-automatizadas)
+13. [Estructura del proyecto](#estructura-del-proyecto)
+14. [Configuración](#configuración)
+15. [Solución de problemas](#solución-de-problemas)
+16. [Decisiones técnicas](#decisiones-técnicas)
+
+---
+
+## ¿Qué hace la aplicación?
+
+| Módulo | Funcionalidad |
+|---|---|
+| **Libros** | Alta, edición, baja y búsqueda por título, autor o género. Control de ejemplares totales y disponibles, filtros (disponibles / agotados), vista de tabla o tarjetas y préstamo rápido. |
+| **Usuarios** | Alta, edición y baja con validación del nombre y del correo (único). Los usuarios con préstamos no se pueden eliminar y la interfaz lo explica antes de intentarlo. |
+| **Préstamos** | Registro con buscador de usuarios, devolución, filtros por estado (activos, vencidos, devueltos) y cálculo automático del vencimiento. |
+| **Estadísticas** | Indicadores clave y gráficas: préstamos por mes, estado de los préstamos, libros más prestados, préstamos por género y usuarios más activos. |
+
+Además: **tema claro / oscuro**, diseño **responsive** (escritorio, tableta y móvil) y accesibilidad (teclado, lectores de pantalla y vista de tabla para cada gráfica).
+
+**Tecnologías:**
+
+| Capa | Tecnología |
+|---|---|
+| Frontend | Angular 22 (componentes standalone, signals, formularios reactivos), TypeScript, CSS |
+| Backend | Spring Boot 4.1 (Spring MVC, Spring Data JPA, Bean Validation, Actuator), Java 21 |
+| Base de datos | H2 en archivo (no requiere instalar nada) |
+| Pruebas | JUnit 5, Mockito, MockMvc (backend) · Vitest (frontend) |
+
+---
+
+## Capturas
+
+| Catálogo de libros | Préstamos vencidos |
+|---|---|
+| <img src="docs/img/libros.jpg" alt="Catálogo de libros" /> | <img src="docs/img/prestamos-vencidos.jpg" alt="Préstamos vencidos" /> |
+| **Validación del nombre de usuario** | **Estadísticas en modo oscuro** |
+| <img src="docs/img/usuario-validacion.jpg" alt="Aviso de validación del nombre" /> | <img src="docs/img/estadisticas-oscuro.jpg" alt="Estadísticas en modo oscuro" /> |
+
+<p align="center">
+  <img src="docs/img/movil-libros.jpg" alt="Vista móvil con el menú de acciones" width="300" /><br/>
+  <em>Vista móvil: cada libro es una tarjeta y sus acciones están en el menú ⋮</em>
+</p>
+
+---
+
+## Requisitos previos
+
+Solo necesitas instalar **tres programas**. **No** hace falta instalar Maven ni ninguna base de datos: el proyecto trae el *Maven Wrapper* y usa H2 embebida.
+
+| Software | Versión | ¿Para qué? | Comprobar en una terminal | Descarga |
+|---|---|---|---|---|
+| **Git** | cualquiera reciente | Descargar el repositorio | `git --version` | [git-scm.com](https://git-scm.com/downloads) |
+| **JDK (Java)** | **21 o superior** | Compilar y ejecutar el backend | `java -version` | [Eclipse Temurin](https://adoptium.net/) |
+| **Node.js** (incluye npm) | **22.22+** (LTS) o **24.15+** | Instalar y ejecutar el frontend | `node -v` y `npm -v` | [nodejs.org](https://nodejs.org/) |
+
+> [!IMPORTANT]
+> Angular 22 **no funciona con Node 20 ni con versiones antiguas de Node 22**. Si `node -v` muestra una versión inferior a `v22.22`, instala la última LTS.
+>
+> La **primera** ejecución necesita **conexión a Internet**: descarga Maven, las dependencias de Java y los paquetes de npm. Después funciona sin conexión.
+
+Puertos que usa la aplicación (deben estar libres):
+
+| Servicio | Puerto | URL |
+|---|---|---|
+| Backend (API) | `8080` | http://localhost:8080 |
+| Frontend (web) | `4200` | http://localhost:4200 |
+
+---
+
+## Descargar el proyecto
+
+**Opción A — con Git (recomendada):**
 
 ```bash
-# Terminal 1: API en http://localhost:8080
-cd backend
-./mvnw spring-boot:run        # en Windows (cmd/PowerShell): mvnw.cmd spring-boot:run
+git clone https://github.com/zseuz/biblioteca.git
+```
 
-# Terminal 2: web en http://localhost:4200
+```bash
+cd biblioteca
+```
+
+**Opción B — sin Git:** en la página del repositorio pulsa **Code → Download ZIP**, descomprímelo y abre una terminal dentro de la carpeta `biblioteca`.
+
+---
+
+## Ponerlo en marcha paso a paso
+
+La aplicación tiene dos partes que se ejecutan **a la vez, en dos terminales distintas**: primero el backend y después el frontend.
+
+```mermaid
+flowchart LR
+    A["1. Instalar Git, JDK 21+ y Node 22.22+"] --> B["2. Clonar el repositorio"]
+    B --> C["3. Terminal 1: arrancar el backend"]
+    C --> D["4. Terminal 2: npm install"]
+    D --> E["5. Terminal 2: npm start"]
+    E --> F["6. Abrir http://localhost:4200"]
+```
+
+### Paso 1 — Backend (Terminal 1)
+
+Entra en la carpeta del backend:
+
+```bash
+cd backend
+```
+
+Arráncalo según tu sistema operativo:
+
+| Sistema | Comando |
+|---|---|
+| Windows (PowerShell) | `.\mvnw.cmd spring-boot:run` |
+| Windows (CMD) | `mvnw.cmd spring-boot:run` |
+| macOS / Linux | `./mvnw spring-boot:run` |
+
+Está listo cuando la consola muestra:
+
+```text
+Tomcat started on port 8080 (http)
+Started BibliotecaApplication in ... seconds
+```
+
+> La primera vez tarda unos minutos porque descarga Maven y las dependencias. **Deja esta terminal abierta.**
+
+### Paso 2 — Frontend (Terminal 2)
+
+Abre **otra** terminal en la carpeta del proyecto y entra en el frontend:
+
+```bash
 cd frontend
+```
+
+Instala las dependencias (solo la primera vez, o cuando cambie `package.json`):
+
+```bash
 npm install
+```
+
+Arranca el servidor de desarrollo:
+
+```bash
 npm start
 ```
 
-Al primer arranque se cargan datos de ejemplo: 6 libros, 3 usuarios y seis meses de historial
-de préstamos, para que las gráficas muestren tendencias desde el inicio.
-Además, en cada arranque se garantizan (sin duplicarlos) dos **registros de prueba** asociados
-al usuario `prueba@biblioteca.test`:
+Está listo cuando aparece:
 
-- **"1984"**: un único ejemplar prestado → aparece como **agotado**.
-- **"Rayuela"**: prestado hace 20 días con plazo de 14 → aparece como **vencido**.
-
-La base se guarda en `backend/data/` (ignorada por git); bórrala para reiniciar los datos.
-
-## Tests
-
-```bash
-cd backend && ./mvnw test
-cd frontend && npm test -- --watch=false
+```text
+➜  Local:   http://localhost:4200/
 ```
 
-## Arquitectura (backend)
+### Paso 3 — Abrir la aplicación
 
+Entra en **http://localhost:4200** con tu navegador.
+
+### Detener la aplicación
+
+Pulsa `Ctrl + C` en cada una de las dos terminales.
+
+---
+
+## Comprobar que todo funciona
+
+| Qué comprobar | Cómo | Resultado esperado |
+|---|---|---|
+| El backend está vivo | Abrir http://localhost:8080/actuator/health | `{"status":"UP", ...}` |
+| La API responde | Abrir http://localhost:8080/api/books | Lista de libros en JSON |
+| El frontend se conecta | Abrir http://localhost:4200 | Catálogo con 8 libros |
+| Registros de prueba | Filtro **Agotados** en Libros y **Vencidos** en Préstamos | «1984» agotado y «Rayuela» vencido |
+
+Si la web muestra *"No se pudo conectar con el servidor"*, el backend no está arrancado (revisa la Terminal 1).
+
+---
+
+## Datos de ejemplo y registros de prueba
+
+En el **primer arranque** (base de datos vacía) se cargan automáticamente:
+
+- **6 libros, 3 usuarios** y **seis meses de historial** de préstamos (devueltos, activos y uno vencido), para que las gráficas muestren tendencias desde el inicio. Las fechas son relativas al día actual.
+
+En **cada arranque**, de forma idempotente (nunca se duplican), se garantizan dos **registros de prueba** asociados al usuario *Usuario de Prueba* (`prueba@biblioteca.test`):
+
+| Registro | Situación | Dónde verlo |
+|---|---|---|
+| **«1984»** de George Orwell | Su único ejemplar está prestado → **Agotado** | Libros → filtro *Agotados* |
+| **«Rayuela»** de Julio Cortázar | Prestado hace 20 días con plazo de 14 → **Vencido** | Préstamos → filtro *Vencidos* |
+
+Los datos se guardan en `backend/data/` (no se sube a Git). **Para reiniciar la base de datos:** detén el backend, borra la carpeta `backend/data/` y vuelve a arrancarlo.
+
+---
+
+## Cómo funciona (diagramas)
+
+### Arquitectura general
+
+```mermaid
+flowchart LR
+    U(["Usuario"]) --> B["Navegador"]
+    subgraph FE["Frontend · Angular 22 · puerto 4200"]
+        P["Páginas<br/>Libros · Usuarios · Préstamos · Estadísticas"]
+        S["ApiService"]
+        I["Interceptor de errores"]
+        P --> S --> I
+    end
+    subgraph BE["Backend · Spring Boot 4 · puerto 8080"]
+        C["Controladores REST<br/>(validan la entrada)"]
+        SV["Servicios<br/>(reglas de negocio y transacciones)"]
+        R["Repositorios<br/>(Spring Data JPA)"]
+        EH["Manejador global de errores"]
+        C --> SV --> R
+        C -.-> EH
+    end
+    DB[("H2<br/>backend/data")]
+    B --> P
+    I -- "HTTP + JSON" --> C
+    R --> DB
 ```
-web/         Controladores REST (solo HTTP: validan y delegan)
-service/     Casos de uso y transacciones; devuelven DTOs, nunca entidades
-repository/  Acceso a datos (Spring Data JPA, consultas JPQL con fetch join y proyecciones)
-domain/      Entidades que protegen sus invariantes (Book.borrowCopy, Loan.markReturned…)
-dto/         Contratos de entrada/salida de la API (records validados)
-config/      Parámetros de negocio tipados y validados (LibraryProperties)
-exception/   Errores de negocio y manejo global -> respuestas JSON uniformes
+
+- El **frontend** es una aplicación de una sola página. Nunca habla con la base de datos; solo consume la API.
+- El **backend** está organizado en capas: el controlador recibe la petición, el servicio aplica las reglas y el repositorio accede a los datos.
+- Los errores se convierten siempre en un JSON uniforme, que el interceptor del frontend traduce a un mensaje claro.
+
+### Modelo de datos
+
+```mermaid
+erDiagram
+    BOOK ||--o{ LOAN : "se presta en"
+    MEMBER ||--o{ LOAN : "realiza"
+    BOOK {
+        long id PK
+        string title "máx. 200"
+        string author "máx. 150"
+        string genre "máx. 80"
+        int totalCopies "mínimo 1"
+        int availableCopies "0 = agotado"
+        long version "bloqueo optimista"
+    }
+    MEMBER {
+        long id PK
+        string name "máx. 100"
+        string email "único"
+    }
+    LOAN {
+        long id PK
+        long book_id FK
+        long member_id FK
+        date loanDate
+        date dueDate "loanDate + 14 días"
+        date returnDate "vacío mientras está activo"
+        long version "bloqueo optimista"
+    }
 ```
 
-### Decisiones técnicas
+### Registrar un préstamo (secuencia completa)
 
-- **DTOs mapeados dentro de la transacción** y `open-in-view=false`: la capa web nunca toca
-  entidades, así que no hay `LazyInitializationException` ni consultas ocultas al serializar.
-- **Sin N+1:** el historial de préstamos se carga con `join fetch`, y las relaciones perezosas
-  se agrupan por lotes (`default_batch_fetch_size`).
-- **Estadísticas en la BD:** `COUNT/GROUP BY` con `LIMIT` y proyección directa a `StatEntry`;
-  no se cargan entidades en memoria.
-- **Índices** sobre las columnas que usan las reglas y los informes (préstamos activos por
-  usuario, por libro y vencidos).
-- **Concurrencia:** `@Version` (bloqueo optimista) en `Book` y `Loan`. Dos préstamos simultáneos
-  del último ejemplar, o una doble devolución, terminan en 409 en lugar de corromper el stock.
-  El correo único se garantiza también con una restricción en la BD.
-- **Reglas configurables** (`library.loans.days`, `library.loans.max-active`), validadas al
-  arrancar; también se pueden fijar con variables de entorno.
-- **Reloj inyectado (`Clock`)** para tests deterministas con fechas.
-- **Errores uniformes** `{timestamp, status, message, path, fields?}`: 400 (validación o JSON
-  mal formado), 404, 409 (regla de negocio o concurrencia) y 500 genérico sin filtrar detalles
-  internos (la traza completa va al log).
-- **Operación:** `/actuator/health` (con *probes* de liveness y readiness), apagado ordenado,
-  compresión de respuestas JSON y logs de los eventos de negocio.
+```mermaid
+sequenceDiagram
+    actor U as Usuario
+    participant W as Angular
+    participant API as LoanController
+    participant S as LoanService
+    participant DB as H2
 
-### Pruebas
+    U->>W: Elige usuario y libro y pulsa «Prestar»
+    W->>API: POST /api/loans con bookId y memberId
+    API->>API: Valida el JSON (@Valid)
+    API->>S: lend(request)
+    S->>DB: Buscar libro y usuario
+    alt Se cumplen todas las reglas
+        S->>DB: Descontar un ejemplar y guardar el préstamo
+        S-->>API: Préstamo (vence en 14 días)
+        API-->>W: 201 Created
+        W-->>U: «Préstamo registrado, vence el ...»
+    else Se incumple una regla
+        S-->>API: BusinessRuleException
+        API-->>W: 409 Conflict con el motivo
+        W-->>U: Mensaje explicando el motivo
+    end
+```
 
-- Unitarias (dominio y `LoanService`, con mocks y reloj fijo): cada regla por separado.
-- Integración (`LibraryApiIntegrationTest`, MockMvc + H2): HTTP → JPA de extremo a extremo,
-  con la misma configuración que producción (`open-in-view=false`).
+### Reglas que se comprueban al prestar
 
-### Siguientes pasos para producción
+```mermaid
+flowchart TD
+    A["Solicitud de préstamo"] --> B{"¿Existen el libro<br/>y el usuario?"}
+    B -- No --> X1["404 · No encontrado"]
+    B -- Sí --> C{"¿Hay ejemplares<br/>disponibles?"}
+    C -- No --> X2["409 · Libro agotado"]
+    C -- Sí --> D{"¿El usuario tiene<br/>préstamos vencidos?"}
+    D -- Sí --> X3["409 · Debe devolver primero"]
+    D -- No --> E{"¿Tiene ya 3<br/>préstamos activos?"}
+    E -- Sí --> X4["409 · Límite alcanzado"]
+    E -- No --> OK["201 · Préstamo creado<br/>vence en 14 días"]
+```
 
-Migraciones con Flyway en lugar de `ddl-auto`, PostgreSQL, paginación del historial de
-préstamos, autenticación (Spring Security + JWT) y documentación OpenAPI.
+### Ciclo de vida de un préstamo
 
-## Reglas de préstamos
+```mermaid
+stateDiagram-v2
+    [*] --> Activo: Se presta (se descuenta un ejemplar)
+    Activo --> Vencido: Pasa la fecha límite sin devolverlo
+    Activo --> Devuelto: Se devuelve (se repone el ejemplar)
+    Vencido --> Devuelto: Se devuelve
+    Devuelto --> [*]
+```
 
-- Plazo de **14 días** (configurable).
-- Máximo **3 préstamos activos** por usuario (configurable).
-- Un usuario con **préstamos vencidos** no puede pedir más libros.
-- Solo se presta si hay **ejemplares disponibles** (cada libro tiene total y disponibles).
-- No se puede eliminar un libro o usuario que tenga historial de préstamos.
-- No se puede reducir el total de ejemplares por debajo de los que están prestados.
+> Mientras un usuario tenga un préstamo **vencido**, no puede pedir más libros.
 
-## Validación del nombre de usuario
+### Eliminar un usuario
+
+```mermaid
+flowchart TD
+    A["Menú ⋮ → Eliminar"] --> B{"¿Tiene préstamos<br/>registrados?"}
+    B -- Sí --> C["Aviso informativo:<br/>préstamos activos e historial<br/>(no se envía ninguna petición)"]
+    B -- No --> D["Confirmación"]
+    D --> E["DELETE /api/members/{id}"]
+    E -- "204" --> F["Usuario eliminado"]
+    E -- "409 (caso raro)" --> G["El motivo se muestra<br/>dentro del diálogo"]
+```
+
+### Validación del nombre de usuario
+
+```mermaid
+flowchart TD
+    A["Escribir el nombre"] --> B{"¿Vacío o solo espacios?"}
+    B -- Sí --> E1["Error: obligatorio"]
+    B -- No --> C{"¿Más de 100 caracteres?"}
+    C -- Sí --> E2["Error: máximo 100<br/>(el HTML no deja escribir más)"]
+    C -- No --> D{"¿Tiene números o<br/>un solo carácter?"}
+    D -- Sí --> W["Aviso + confirmación<br/>«¿El nombre es correcto?»"]
+    D -- No --> OK["Se guarda"]
+    W -- "Sí, registrar" --> OK
+    W -- "Cancelar" --> A
+```
+
+---
+
+## Guía de uso por pantalla
+
+### Libros
+
+- **Nuevo libro:** botón superior derecho. Todos los campos son obligatorios y debe haber al menos 1 ejemplar.
+- **Buscar:** escribe en el buscador (título, autor o género). Combina la búsqueda con el filtro de género y con *Todos / Disponibles / Agotados*.
+- **Ordenar:** haz clic en la cabecera de una columna.
+- **Vista:** alterna entre tabla y tarjetas con los iconos de la derecha.
+- **Acciones (⋮):** *Prestar* (solo si hay ejemplares), *Editar* y *Eliminar*. Un libro con historial de préstamos no se puede eliminar.
+
+### Usuarios
+
+- **Nuevo usuario:** nombre (máx. 100 caracteres, con contador) y correo válido y único.
+- Si el nombre contiene **números** o tiene **un solo carácter**, aparece un aviso y se pide confirmación antes de guardarlo.
+- **Eliminar:** si el usuario tiene préstamos, se explica por qué no es posible, sin intentarlo.
+
+### Préstamos
+
+- **Registrar préstamo:** el campo de usuario es un buscador. Al hacer clic muestra a todos los usuarios y al escribir filtra por nombre o correo, sin importar mayúsculas ni tildes.
+- **Filtros:** *Todos, Activos, Vencidos, Devueltos*, más una búsqueda por libro o usuario.
+- **Devolver:** menú ⋮ → *Registrar devolución* (solo en préstamos activos o vencidos).
+
+### Estadísticas
+
+- **Indicadores:** títulos, usuarios, préstamos activos y vencidos (este último se resalta en rojo si hay alguno).
+- **Gráficas:** pasa el ratón (o navega con Tab) para ver el detalle. Cada tarjeta tiene un botón **Gráfica / Tabla** con los mismos datos en formato tabla.
+- **Actualizar datos:** recarga el panel sin parpadeos.
+
+---
+
+## Reglas de negocio y validaciones
+
+### Préstamos
+
+| Regla | Valor | Configurable en |
+|---|---|---|
+| Plazo de devolución | 14 días | `library.loans.days` |
+| Préstamos activos por usuario | máximo 3 | `library.loans.max-active` |
+| Usuario con préstamos vencidos | no puede pedir más | — |
+| Libro sin ejemplares disponibles | no se presta | — |
+
+### Bajas y ediciones
+
+- No se puede eliminar un **libro** o un **usuario** con historial de préstamos (para conservar la trazabilidad).
+- No se puede reducir el total de ejemplares de un libro por debajo de los que están prestados.
+- El correo de un usuario es único (sin distinguir mayúsculas).
+
+### Validación del nombre de usuario (en las tres capas)
 
 | Capa | Regla |
 |---|---|
-| HTML | `required` y `maxlength="100"` en el campo |
+| HTML | `required` y `maxlength="100"` |
 | Angular | `required`, sin solo espacios y `maxLength(100)`, con contador de caracteres |
-| Backend | `@NotBlank` y `@Size(max = 100)` en `MemberRequest` → 400 con el mensaje del campo |
+| Backend | `@NotBlank` y `@Size(max = 100)` → `400` con el mensaje del campo |
 
-Si el nombre contiene números o tiene un solo carácter (letra o número) **no se bloquea**,
-porque puede ser legítimo: la interfaz muestra un aviso y pide confirmar el nombre antes de
-registrarlo.
+Los nombres con números o de un solo carácter **no se bloquean** (pueden ser legítimos): la interfaz avisa y pide confirmación.
 
-## API
+---
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/books?q=` | Lista/busca por título, autor o género |
-| POST / PUT / DELETE | `/api/books[/{id}]` | Alta, edición, baja |
-| GET, POST, PUT, DELETE | `/api/members[/{id}]` | CRUD de usuarios |
-| GET | `/api/loans` | Historial (estado: ACTIVE, OVERDUE, RETURNED) |
-| POST | `/api/loans` | Prestar `{bookId, memberId}` |
-| POST | `/api/loans/{id}/return` | Registrar devolución |
-| GET | `/api/stats` | Estadísticas |
+## API REST
 
-## Estadísticas propuestas
+URL base: `http://localhost:8080/api`
 
-| Gráfica | Pregunta que responde |
+| Método | Ruta | Descripción | Respuestas |
+|---|---|---|---|
+| `GET` | `/books?q=texto` | Lista o busca libros | 200 |
+| `GET` | `/books/{id}` | Detalle de un libro | 200 · 404 |
+| `POST` | `/books` | Crea un libro | 201 · 400 |
+| `PUT` | `/books/{id}` | Edita un libro | 200 · 400 · 404 · 409 |
+| `DELETE` | `/books/{id}` | Elimina un libro sin historial | 204 · 404 · 409 |
+| `GET` | `/members` | Lista usuarios con `activeLoans` y `totalLoans` | 200 |
+| `POST` | `/members` | Crea un usuario | 201 · 400 · 409 |
+| `PUT` | `/members/{id}` | Edita un usuario | 200 · 400 · 404 · 409 |
+| `DELETE` | `/members/{id}` | Elimina un usuario sin historial | 204 · 404 · 409 |
+| `GET` | `/loans` | Historial (estado `ACTIVE`, `OVERDUE` o `RETURNED`) | 200 |
+| `POST` | `/loans` | Presta un libro `{bookId, memberId}` | 201 · 400 · 404 · 409 |
+| `POST` | `/loans/{id}/return` | Registra la devolución | 200 · 404 · 409 |
+| `GET` | `/stats` | Indicadores y series para las gráficas | 200 |
+
+**Ejemplo — crear un usuario:**
+
+```bash
+curl -X POST http://localhost:8080/api/members -H "Content-Type: application/json" -d "{\"name\":\"Laura Gomez\",\"email\":\"laura@example.com\"}"
+```
+
+**Formato de error** (igual en toda la API):
+
+```json
+{
+  "timestamp": "2026-10-06T21:00:00Z",
+  "status": 400,
+  "message": "Datos inválidos",
+  "path": "/api/members",
+  "fields": { "name": "El nombre no puede superar los 100 caracteres" }
+}
+```
+
+| Código | Significado |
 |---|---|
-| Totales (libros, usuarios, activos, vencidos) | ¿Cómo está la biblioteca hoy? |
-| **Préstamos por mes** (últimos 6, columnas) | ¿Sube o baja la circulación? |
-| **Estado de los préstamos** (devueltos / al día / vencidos) | ¿Cuánto hay que reclamar? |
-| **Libros más prestados** | ¿Qué títulos conviene comprar? |
-| **Préstamos por género** (con %) | ¿Qué categorías interesan más? |
-| **Usuarios más activos** | ¿Quiénes son los lectores frecuentes? |
+| `400` | Datos inválidos o JSON mal formado (`fields` indica qué campo falla) |
+| `404` | El recurso no existe |
+| `409` | Se incumple una regla de negocio o hubo un conflicto de concurrencia |
+| `500` | Error inesperado (mensaje genérico; el detalle queda en el log del servidor) |
 
-Las gráficas son componentes propios en SVG/HTML (sin librerías): adaptables al ancho,
-con tooltip por ratón y teclado, una vista de tabla accesible en cada tarjeta y una paleta
-validada para daltonismo y contraste en los temas claro y oscuro. Las agregaciones se hacen
-en la base de datos y la serie mensual se rellena con ceros para no saltar meses.
+---
 
-## Frontend
+## Pruebas automatizadas
 
-Rutas: `/libros`, `/usuarios`, `/prestamos`, `/estadisticas` (carga diferida).
-Validaciones en formularios, un interceptor HTTP que traduce los errores de la API a mensajes
-claros (incluido "servidor apagado"), diseño responsivo, etiquetas asociadas a cada campo,
-navegación por teclado, foco visible, enlace "saltar al contenido" y avisos con `aria-live`.
+| Proyecto | Comando | Qué cubre |
+|---|---|---|
+| Backend (23 tests) | `cd backend` y después `./mvnw test` (Windows: `.\mvnw.cmd test`) | Reglas del dominio, reglas de préstamo con reloj fijo y pruebas de integración HTTP → JPA → H2 |
+| Frontend (36 tests) | `cd frontend` y después `npm test -- --watch=false` | Servicio de API, interceptor, páginas, validaciones, menú de acciones y buscador |
 
-- **Tema claro / oscuro** con un selector en la cabecera.
-- **Responsive sin scroll horizontal:** las tablas ocultan columnas secundarias en pantallas
-  medianas y se convierten en tarjetas en móvil; la navegación pasa a 4 pestañas.
-- **Menú de acciones (⋮)** reutilizable en cada fila o tarjeta, accesible por teclado.
-- **Buscador de usuarios (combobox)** en los préstamos: muestra todos al hacer clic y filtra
-  al escribir por nombre o correo, sin importar tildes.
+Los tests del backend usan una base H2 **en memoria**, así que nunca modifican tus datos.
 
-## Flujo de Git
+---
 
-`main` + ramas `feature/*` fusionadas con `--no-ff`, commits pequeños y descriptivos (Conventional Commits).
+## Estructura del proyecto
+
+```text
+biblioteca/
+├── backend/                         API REST (Spring Boot)
+│   ├── mvnw, mvnw.cmd               Maven Wrapper (no hace falta instalar Maven)
+│   ├── pom.xml                      Dependencias
+│   └── src/
+│       ├── main/java/com/biblioteca/
+│       │   ├── web/                 Controladores REST
+│       │   ├── service/             Casos de uso y reglas de negocio
+│       │   ├── repository/          Acceso a datos (JPA)
+│       │   ├── domain/              Entidades: Book, Member, Loan
+│       │   ├── dto/                 Contratos de entrada y salida de la API
+│       │   ├── exception/           Errores y manejador global
+│       │   ├── config/              Parámetros de negocio (LibraryProperties)
+│       │   └── DataSeeder.java      Datos de ejemplo y registros de prueba
+│       ├── main/resources/application.properties
+│       └── test/                    Tests unitarios y de integración
+├── frontend/                        Aplicación web (Angular)
+│   ├── public/favicon.svg           Icono de la aplicación
+│   └── src/
+│       ├── styles.css               Tema claro/oscuro y estilos globales
+│       └── app/
+│           ├── core/                ApiService, interceptor, modelos, validaciones
+│           ├── pages/               Libros, Usuarios, Préstamos, Estadísticas
+│           └── shared/              Modal, menú ⋮, buscador, gráficas, iconos
+└── docs/img/                        Capturas usadas en este README
+```
+
+---
+
+## Configuración
+
+Ajustes principales en `backend/src/main/resources/application.properties`. Todos se pueden sobrescribir con variables de entorno, sin tocar el código:
+
+| Propiedad | Por defecto | Variable de entorno | Descripción |
+|---|---|---|---|
+| `server.port` | `8080` | `SERVER_PORT` | Puerto de la API |
+| `spring.datasource.url` | `jdbc:h2:file:./data/biblioteca` | `SPRING_DATASOURCE_URL` | Ubicación de la base de datos |
+| `library.loans.days` | `14` | `LIBRARY_LOANS_DAYS` | Días de plazo de un préstamo |
+| `library.loans.max-active` | `3` | `LIBRARY_LOANS_MAX_ACTIVE` | Préstamos activos por usuario |
+| `app.cors.allowed-origins` | `http://localhost:4200` | `CORS_ALLOWED_ORIGINS` | Origen permitido para el frontend |
+
+La URL de la API que usa el frontend está en `frontend/src/app/core/api.service.ts` (`API_URL`).
+
+---
+
+## Solución de problemas
+
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| `java` no se reconoce como comando | JDK no instalado o fuera del PATH | Instala Temurin 21+ y abre una terminal nueva |
+| `release version 21 not supported` | JDK anterior a 21 | Instala JDK 21 o superior y comprueba `java -version` |
+| `./mvnw: Permission denied` (macOS/Linux) | El script no es ejecutable | `chmod +x mvnw` |
+| `Port 8080 was already in use` | Otra instancia del backend sigue abierta | Ciérrala o cambia el puerto con `SERVER_PORT=8081` (y `API_URL` en el frontend) |
+| `npm install` falla o `ng` exige otra versión de Node | Node antiguo | Instala Node 22.22+ LTS o 24.15+ |
+| La web dice *"No se pudo conectar con el servidor"* | El backend no está arrancado | Arranca el backend (Terminal 1) y recarga la página |
+| Error de CORS en la consola del navegador | El frontend usa otro puerto u origen | Ajusta `CORS_ALLOWED_ORIGINS` |
+| Quiero empezar con los datos de ejemplo limpios | — | Detén el backend, borra `backend/data/` y arráncalo de nuevo |
+| Las gráficas aparecen vacías | Base de datos sin historial | Registra préstamos o reinicia los datos de ejemplo |
+
+---
+
+## Decisiones técnicas
+
+- **Arquitectura en capas** (controlador → servicio → repositorio) con **DTOs**: las entidades nunca salen de la transacción, así que no hay errores de carga perezosa ni consultas ocultas.
+- **Sin N+1:** el historial se carga con `join fetch`, y los contadores por usuario y las estadísticas se agregan en la base de datos con una sola consulta.
+- **Concurrencia segura:** bloqueo optimista (`@Version`) en libros y préstamos. Dos préstamos simultáneos del último ejemplar terminan en `409`, nunca en stock negativo.
+- **Índices** en las columnas que usan las reglas y los informes.
+- **Reloj inyectado (`Clock`)** para probar fechas de forma determinista.
+- **Errores uniformes** y sin filtrar detalles internos; los `500` se registran con la traza completa en el log.
+- **Operación:** `/actuator/health` con *probes*, apagado ordenado y compresión de respuestas JSON.
+- **Frontend:** componentes standalone con `OnPush` y signals, carga diferida por ruta, interceptor de errores, gráficas propias en SVG (sin librerías) con una paleta validada para daltonismo y contraste, y diseño accesible (teclado, `aria-*`, vista de tabla para las gráficas).
+
+**Siguientes pasos para producción:** migraciones con Flyway, PostgreSQL, paginación del historial, autenticación (Spring Security + JWT) y documentación OpenAPI.
