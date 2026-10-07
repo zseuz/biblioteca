@@ -52,6 +52,24 @@ class BookTest {
     }
 
     @Test
+    void addCopiesIncreasesTotalAndAvailable() {
+        Book book = new Book("Dune", "Frank Herbert", "Ciencia ficción", 1);
+        book.borrowCopy();
+
+        book.addCopies(2);
+
+        assertThat(book.getTotalCopies()).isEqualTo(3);
+        assertThat(book.getAvailableCopies()).as("los nuevos llegan disponibles").isEqualTo(2);
+        assertThatThrownBy(() -> book.addCopies(0)).isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void normalizeTrimsAndCollapsesWhitespace() {
+        assertThat(Book.normalize("  Cien   años  de soledad ")).isEqualTo("Cien años de soledad");
+        assertThat(Book.normalize(null)).isEmpty();
+    }
+
+    @Test
     void requiresAtLeastOneCopy() {
         assertThatThrownBy(() -> new Book("Dune", "Frank Herbert", "Ciencia ficción", 0))
                 .isInstanceOf(BusinessRuleException.class);

@@ -1,5 +1,7 @@
 package com.biblioteca.web;
 
+import com.biblioteca.dto.AddCopiesRequest;
+import com.biblioteca.dto.BookDuplicateCheck;
 import com.biblioteca.dto.BookRequest;
 import com.biblioteca.dto.BookResponse;
 import com.biblioteca.exception.ApiError;
@@ -45,6 +47,29 @@ public class BookController {
         return service.search(q);
     }
 
+    @Operation(summary = "Comprobar si un libro ya existe",
+            description = "Antes de registrar un libro: `sameBook` es el que tiene el mismo título, autor y género "
+                    + "(se le pueden añadir ejemplares) y `differentGenre` los que solo cambian en el género. "
+                    + "No distingue mayúsculas ni espacios sobrantes.")
+    @GetMapping("/duplicates")
+    public BookDuplicateCheck duplicates(
+            @Parameter(example = "Cien años de soledad") @RequestParam String title,
+            @Parameter(example = "Gabriel García Márquez") @RequestParam String author,
+            @Parameter(example = "Novela") @RequestParam(defaultValue = "") String genre) {
+        return service.checkDuplicates(title, author, genre);
+    }
+
+    @Operation(summary = "Añadir ejemplares a un libro existente",
+            description = "Incrementa el total y los disponibles. Es la alternativa a registrar de nuevo un libro que ya existe.")
+    @ApiResponse(responseCode = "200", description = "Libro con los ejemplares actualizados")
+    @ApiResponse(responseCode = "400", description = "Cantidad fuera de rango (1-1000)",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @PostMapping("/{id}/copies")
+    public BookResponse addCopies(@PathVariable Long id, @Valid @RequestBody AddCopiesRequest request) {
+        return service.addCopies(id, request.quantity());
+    }
+
     @Operation(summary = "Obtener un libro")
     @ApiResponse(responseCode = "200", description = "Libro encontrado")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -53,9 +78,12 @@ public class BookController {
         return service.get(id);
     }
 
-    @Operation(summary = "Crear un libro", description = "Todos los ejemplares quedan disponibles.")
+    @Operation(summary = "Crear un libro", description = "Todos los ejemplares quedan disponibles. No se permite "
+            + "registrar dos veces el mismo título, autor y género: en ese caso hay que añadir ejemplares.")
     @ApiResponse(responseCode = "201", description = "Libro creado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Ya existe un libro con el mismo título, autor y género",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public BookResponse create(@Valid @RequestBody BookRequest request) {
@@ -66,7 +94,7 @@ public class BookController {
     @ApiResponse(responseCode = "200", description = "Libro actualizado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @ApiResponse(responseCode = "409", description = "El total sería menor que los ejemplares prestados",
+    @ApiResponse(responseCode = "409", description = "El total sería menor que los prestados, o los datos coinciden con otro libro",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/{id}")
     public BookResponse update(@PathVariable Long id, @Valid @RequestBody BookRequest request) {
