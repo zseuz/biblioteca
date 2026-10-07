@@ -144,4 +144,54 @@ describe('BooksPage', () => {
     expect(fixture.componentInstance.form.getRawValue().genre).toBe('Novela');
     http.expectNone((r) => r.method === 'POST');
   });
+
+  describe('préstamo rápido de un libro que el usuario ya tiene', () => {
+    const existingLoan = {
+      id: 7,
+      bookId: 1,
+      bookTitle: 'Dune',
+      memberId: 1,
+      memberName: 'Ana Torres',
+      loanDate: '2026-10-01',
+      dueDate: '2026-10-15',
+      returnDate: null,
+      status: 'ACTIVE',
+    };
+    const quickLoanText = 'Préstamo del libro: Dune'; // subtítulo de la ventana de préstamo
+    const repeatText = 'Este usuario ya tiene el libro';
+
+    async function requestSameBook() {
+      const fixture = create();
+      fixture.componentInstance.openQuickLoan(dune);
+      http
+        .expectOne(`${API_URL}/members`)
+        .flush([{ id: 1, name: 'Ana Torres', email: 'ana@example.com', activeLoans: 1, totalLoans: 1 }]);
+      fixture.componentInstance.quickLoanMember.setValue(1);
+      fixture.componentInstance.submitQuickLoan();
+      http.expectOne((r) => r.url === `${API_URL}/loans/active`).flush([existingLoan]);
+      await fixture.whenStable();
+      return fixture;
+    }
+
+    it('muestra solo el aviso: la ventana de préstamo se oculta en lugar de quedar detrás', async () => {
+      const fixture = await requestSameBook();
+      const text = document.body.textContent ?? '';
+
+      expect(text).toContain(repeatText);
+      expect(text).not.toContain(quickLoanText);
+      expect(fixture.componentInstance.quickLoanModalOpen()).toBe(true); // se conserva, solo está oculta
+    });
+
+    it('al cancelar el aviso vuelve la ventana de préstamo con el usuario elegido', async () => {
+      const fixture = await requestSameBook();
+
+      fixture.componentInstance.repeat.set(null);
+      await fixture.whenStable();
+
+      const text = document.body.textContent ?? '';
+      expect(text).toContain(quickLoanText);
+      expect(text).not.toContain(repeatText);
+      expect(fixture.componentInstance.quickLoanMember.value).toBe(1);
+    });
+  });
 });

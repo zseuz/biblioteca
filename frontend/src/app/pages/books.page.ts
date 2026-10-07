@@ -476,9 +476,10 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
       (cancel)="repeat.set(null)"
     />
 
-    <!-- Modal de Préstamo Rápido desde Catálogo -->
+    <!-- Modal de Préstamo Rápido desde Catálogo. Se oculta mientras se muestra el aviso de
+         préstamo repetido (conserva lo elegido) y reaparece si se cancela el aviso. -->
     <app-modal
-      [open]="quickLoanModalOpen()"
+      [open]="quickLoanModalOpen() && !repeat()"
       title="Registrar préstamo"
       [subtitle]="'Préstamo del libro: ' + (quickLoanBook()?.title ?? '')"
       size="md"
