@@ -44,35 +44,6 @@ describe('MembersPage', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('carlos@example.com');
   });
 
-  it('no envía el formulario con datos inválidos', () => {
-    const fixture = create();
-    fixture.componentInstance.save();
-    fixture.detectChanges();
-
-    http.expectNone(`${API_URL}/members`);
-    expect(fixture.componentInstance.form.invalid).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
-      'El nombre es obligatorio.',
-    );
-  });
-
-  it('rechaza nombres de más de 100 caracteres (HTML y validador de Angular)', async () => {
-    const fixture = create();
-    fixture.componentInstance.openCreate();
-    await fixture.whenStable();
-
-    const input = document.getElementById('name') as HTMLInputElement;
-    expect(input.getAttribute('maxlength')).toBe('100');
-
-    fixture.componentInstance.form.setValue({ name: 'A'.repeat(101), email: 'a@example.com' });
-    fixture.componentInstance.form.markAllAsTouched();
-    fixture.componentInstance.save();
-    await fixture.whenStable();
-
-    http.expectNone(`${API_URL}/members`);
-    expect(document.body.textContent).toContain('El nombre no puede superar los 100 caracteres (tiene 101).');
-  });
-
   it('pide confirmación si el nombre tiene números y guarda al confirmar', async () => {
     const fixture = create();
     fixture.componentInstance.openCreate();
@@ -94,7 +65,7 @@ describe('MembersPage', () => {
     expect(fixture.componentInstance.nameConfirmOpen()).toBe(false);
   });
 
-  it('pide confirmación si el nombre es una sola letra y permite revisarlo', async () => {
+  it('pide confirmación con nombres muy cortos (1 o 2 caracteres) y permite revisarlos', async () => {
     const fixture = create();
     fixture.componentInstance.openCreate();
     fixture.componentInstance.form.setValue({ name: 'X', email: 'x@example.com' });
@@ -105,6 +76,14 @@ describe('MembersPage', () => {
     fixture.componentInstance.reviewName();
     expect(fixture.componentInstance.nameConfirmOpen()).toBe(false);
     http.expectNone(`${API_URL}/members`);
+
+    // Con 2 caracteres tampoco es un error: también pide confirmación antes de guardar.
+    fixture.componentInstance.form.setValue({ name: 'Al', email: 'al@example.com' });
+    fixture.componentInstance.save();
+    await fixture.whenStable();
+    http.expectNone(`${API_URL}/members`);
+    expect(fixture.componentInstance.nameConfirmOpen()).toBe(true);
+    expect(document.body.textContent).toContain('El nombre tiene solo 2 caracteres.');
   });
 
   describe('eliminación', () => {
@@ -241,7 +220,7 @@ describe('MembersPage', () => {
       el.dispatchEvent(new Event('input'));
     };
 
-    it('distingue un campo vacío de un correo mal escrito o demasiado corto', async () => {
+    it('valida nombre y correo (vacío, formato y longitudes) y no envía el formulario con errores', async () => {
       const fixture = create();
       fixture.componentInstance.openCreate();
       const form = fixture.componentInstance.form;
@@ -250,6 +229,17 @@ describe('MembersPage', () => {
       form.markAllAsTouched();
       await fixture.whenStable();
       expect(errors()).toEqual(['El nombre es obligatorio.', 'El correo es obligatorio.']);
+      fixture.componentInstance.save();
+      http.expectNone(`${API_URL}/members`); // con errores no se envía nada
+      expect(form.invalid).toBe(true);
+
+      // Nombre: el HTML no deja escribir más de 100 y Angular avisa si llegan más (p. ej. al pegar).
+      expect(document.getElementById('name')?.getAttribute('maxlength')).toBe('100');
+      form.setValue({ name: 'A'.repeat(101), email: 'a@example.com' });
+      await fixture.whenStable();
+      expect(errors()).toEqual(['El nombre no puede superar los 100 caracteres (tiene 101).']);
+      fixture.componentInstance.save();
+      http.expectNone(`${API_URL}/members`);
 
       form.setValue({ name: 'Ana', email: 'no-es-correo' });
       await fixture.whenStable();
@@ -262,17 +252,6 @@ describe('MembersPage', () => {
       typeInto('email', 'a'.repeat(150) + '@example.com');
       await fixture.whenStable();
       expect(errors()[0]).toContain('El correo no puede superar los 150 caracteres (tiene 162)');
-    });
-
-    it('un nombre de 2 caracteres no es un error: pide confirmación, como el de una letra', async () => {
-      const fixture = create();
-      fixture.componentInstance.openCreate();
-      fixture.componentInstance.form.setValue({ name: 'Al', email: 'al@example.com' });
-      fixture.componentInstance.save();
-      await fixture.whenStable();
-
-      http.expectNone(`${API_URL}/members`); // todavía no guarda
-      expect(document.body.textContent).toContain('El nombre tiene solo 2 caracteres.');
     });
   });
 

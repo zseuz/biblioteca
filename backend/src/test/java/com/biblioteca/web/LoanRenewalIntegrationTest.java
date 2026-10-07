@@ -100,20 +100,34 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.renewableFrom", nullValue()));
     }
 
-    /** Renovar dentro de la ventana: vence en 14 días desde hoy y queda la hora de la renovación. */
+    /**
+     * Renovar dentro de la ventana: vence en 14 días desde hoy y queda la hora; una segunda renovación
+     * el mismo día se rechaza indicando la hora de la primera.
+     */
     @Test
     void renewingInTheLastFiveDaysGivesFourteenDaysFromToday() throws Exception {
-        mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
+        String json = mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dueDate", is(today.plusDays(14).toString())))
                 .andExpect(jsonPath("$.loanDate", is(today.minusDays(10).toString())))
                 .andExpect(jsonPath("$.renewals", is(1)))
                 .andExpect(jsonPath("$.lastRenewedOn", is(today.toString())))
                 // Ya renovado: se podrá volver a renovar 9 días después de hoy (14 - 5).
-                .andExpect(jsonPath("$.renewableFrom", is(today.plusDays(9).toString())));
+                .andExpect(jsonPath("$.renewableFrom", is(today.plusDays(9).toString())))
+                .andReturn().getResponse().getContentAsString();
+
+        // Una segunda renovación el mismo día se rechaza indicando a qué hora fue la primera,
+        // y no se registra en el historial.
+        String time = com.jayway.jsonpath.JsonPath.<String>read(json, "$.lastRenewedAt").substring(11, 16);
+        mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("ya se renovó hoy a las " + time)))
+                .andExpect(jsonPath("$.message", containsString("No es posible renovar hasta el " + format(today.plusDays(9)))));
+        mvc.perform(get("/api/loans/{id}/renewals", inTime.getId()))
+                .andExpect(jsonPath("$.renewals", hasSize(1)));
     }
 
-    /** Renovar antes de tiempo: 409 con la fecha exacta, y no se registra nada. */
+    /** Renovar antes de tiempo (también un préstamo recién hecho): 409 con la fecha exacta, y no se registra nada. */
     @Test
     void renewingTooEarlyIsRejectedSayingFromWhen() throws Exception {
         mvc.perform(post("/api/loans/{id}/renew", tooEarly.getId()))
@@ -125,6 +139,18 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/loans/{id}/renewals", tooEarly.getId()))
                 .andExpect(jsonPath("$.renewals", hasSize(0)))
                 .andExpect(jsonPath("$.loan.dueDate", is(today.plusDays(9).toString())));
+
+        // Un préstamo recién hecho por la API tampoco se puede renovar: vence en 14 días, se podrá desde el día 9.
+        Member luis = members.save(new Member("Luis", "luis@example.com"));
+        String body = "{\"bookId\":%d,\"memberId\":%d}".formatted(dune.getId(), luis.getId());
+        String json = mvc.perform(post("/api/loans").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = com.jayway.jsonpath.JsonPath.<Number>read(json, "$.id").longValue();
+
+        // Vence en 14 días → se podrá renovar desde el día 9.
+        mvc.perform(post("/api/loans/{id}/renew", id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("No es posible renovar hasta el " + format(today.plusDays(9)))));
     }
 
     /** Vencidos y devueltos no se renuevan (409); un préstamo inexistente da 404. */
@@ -142,20 +168,6 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
         mvc.perform(post("/api/loans/{id}/renew", 999_999)).andExpect(status().isNotFound());
     }
 
-    /** Un préstamo hecho hoy por la API no se puede renovar hasta sus últimos 5 días. */
-    @Test
-    void aLoanMadeTodayCannotBeRenewedYet() throws Exception {
-        Member luis = members.save(new Member("Luis", "luis@example.com"));
-        String body = "{\"bookId\":%d,\"memberId\":%d}".formatted(dune.getId(), luis.getId());
-        String json = mvc.perform(post("/api/loans").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        long id = com.jayway.jsonpath.JsonPath.<Number>read(json, "$.id").longValue();
-
-        // Vence en 14 días → se podrá renovar desde el día 9.
-        mvc.perform(post("/api/loans/{id}/renew", id))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message", containsString("No es posible renovar hasta el " + format(today.plusDays(9)))));
-    }
 
     /** El historial muestra el préstamo inicial y cada renovación con sus fechas y días ganados. */
     @Test
@@ -178,20 +190,6 @@ class LoanRenewalIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/loans/{id}/renewals", 999_999)).andExpect(status().isNotFound());
     }
 
-    /** La segunda renovación del día se rechaza indicando la hora de la primera. */
-    @Test
-    void renewingTwiceTheSameDayIsRejectedWithTheTimeOfTheFirstRenewal() throws Exception {
-        String json = mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        String time = com.jayway.jsonpath.JsonPath.<String>read(json, "$.lastRenewedAt").substring(11, 16);
-
-        mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message", containsString("ya se renovó hoy a las " + time)))
-                .andExpect(jsonPath("$.message", containsString("No es posible renovar hasta el " + format(today.plusDays(9)))));
-        mvc.perform(get("/api/loans/{id}/renewals", inTime.getId()))
-                .andExpect(jsonPath("$.renewals", hasSize(1)));
-    }
 
     /** Préstamos renovados con una versión antigua (sin historial) se cuentan como renovaciones sin detalle. */
     @Test

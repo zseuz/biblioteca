@@ -69,19 +69,13 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.loansByGenre[0].label", is("Ciencia ficción")));
     }
 
-    /** Un cuerpo con datos inválidos responde 400 con el error de cada campo en «fields». */
-    @Test
-    void invalidPayloadReturns400WithFieldErrors() throws Exception {
-        mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"\",\"author\":\"x\",\"genre\":\"y\",\"totalCopies\":0}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fields.title").exists())
-                .andExpect(jsonPath("$.fields.totalCopies").exists());
-    }
 
-    /** Nombre de 101 caracteres: 400 con el mensaje del campo; 100 exactos sí se aceptan. */
+    /**
+     * Validación del usuario: nombre de máximo 100 caracteres (100 exactos sí), correo de al menos 6,
+     * y nombres con números o muy cortos aceptados (la web solo pide confirmación).
+     */
     @Test
-    void memberNameLongerThan100CharsIsRejected() throws Exception {
+    void memberFieldsAreValidatedButUnusualNamesAreAccepted() throws Exception {
         String longName = "A".repeat(101);
 
         mvc.perform(post("/api/members").contentType(MediaType.APPLICATION_JSON)
@@ -91,18 +85,26 @@ class LibraryApiIntegrationTest extends IntegrationTest {
 
         // Exactamente 100 caracteres sí es válido.
         createMember("B".repeat(100), "justo@example.com");
-    }
 
-    /** Nombres con números o de 1–2 caracteres se aceptan: la web solo pide confirmación. */
-    @Test
-    void memberNameWithDigitsOrSingleCharIsAccepted() throws Exception {
+        // Nombres con números o de 1–2 caracteres sí se aceptan: la web solo pide confirmación.
         // No se bloquean: la interfaz pide confirmación, pero pueden ser nombres legítimos.
         createMember("Juan Pablo 2", "jp2@example.com");
         createMember("X", "x@example.com");
         createMember("Al", "al@example.com");
+
+        // El correo debe tener al menos 6 caracteres.
+        mvc.perform(post("/api/members").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ana\",\"email\":\"a@b.c\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.email").exists());
+        createMember("Ana", "a@b.co"); // 6 caracteres: válido
     }
 
-    /** Límites de cada campo del libro (mínimo, máximo, ejemplares 1–1000), sin contar espacios, y los valores justo en el límite. */
+
+    /**
+     * Límites de cada campo del libro (mínimo, máximo, ejemplares 1–1000), sin contar espacios, con
+     * varios errores a la vez en «fields» y los valores justo en el límite.
+     */
     @Test
     void bookFieldsHaveMinimumAndMaximumLengthsWithClearMessages() throws Exception {
         String base = "{\"title\":\"%s\",\"author\":\"%s\",\"genre\":\"%s\",\"totalCopies\":%d}";
@@ -130,17 +132,15 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         // En los límites exactos sí se acepta.
         createBook("It", "Ana", "Cuento", 1000);
         createBook("t".repeat(200), "a".repeat(150), "g".repeat(80), 1);
+
+        // Varios campos inválidos a la vez: la respuesta trae el error de cada uno en «fields».
+        mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"\",\"author\":\"x\",\"genre\":\"y\",\"totalCopies\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.title").exists())
+                .andExpect(jsonPath("$.fields.totalCopies").exists());
     }
 
-    /** El correo debe tener al menos 6 caracteres. */
-    @Test
-    void memberEmailMustHaveBetweenSixAndOneHundredFiftyCharacters() throws Exception {
-        mvc.perform(post("/api/members").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Ana\",\"email\":\"a@b.c\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fields.email").exists());
-        createMember("Ana", "a@b.co"); // 6 caracteres: válido
-    }
 
     private ResultActions postBook(String json) throws Exception {
         return mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content(json));
@@ -161,11 +161,14 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/books/{id}", id)).andExpect(jsonPath("$.totalCopies", is(2)));
     }
 
-    /** La consulta de duplicados distingue el libro idéntico del mismo libro con otro género. */
+    /**
+     * La consulta de duplicados distingue el libro idéntico del mismo libro con otro género, que sí se
+     * puede crear.
+     */
     @Test
     void duplicateCheckSeparatesSameBookFromDifferentGenre() throws Exception {
         long novela = createBook("Rayuela", "Julio Cortázar", "Novela", 1);
-        long ficcion = createBook("Rayuela", "Julio Cortázar", "Ficción", 1);
+        long ficcion = createBook("Rayuela", "Julio Cortázar", "Ficción", 1); // otro género: se crea (createBook exige 201)
         createBook("Rayuela", "Otro Autor", "Novela", 1); // otro autor: no cuenta
 
         mvc.perform(get("/api/books/duplicates")
@@ -181,12 +184,6 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.differentGenre", hasSize(2)));
     }
 
-    /** El mismo título y autor con otro género sí se puede crear. */
-    @Test
-    void sameTitleAndAuthorWithDifferentGenreIsAllowed() throws Exception {
-        createBook("Rayuela", "Julio Cortázar", "Novela", 1);
-        createBook("Rayuela", "Julio Cortázar", "Ficción", 1); // createBook exige 201
-    }
 
     /** Sumar ejemplares por la API; cantidades fuera de rango o libro inexistente se rechazan. */
     @Test
@@ -232,12 +229,6 @@ class LibraryApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.components.schemas.ApiError").exists());
     }
 
-    /** Un JSON mal escrito responde 400, no un error 500. */
-    @Test
-    void malformedJsonReturns400() throws Exception {
-        mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content("{no es json"))
-                .andExpect(status().isBadRequest());
-    }
 
     /** Registrar un correo que ya existe (aunque cambien las mayúsculas) responde 409. */
     @Test
@@ -314,9 +305,9 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/books").param("q", "50%")).andExpect(jsonPath("$", hasSize(0)));
     }
 
-    /** Si falta un parámetro obligatorio la API responde 400 con su nombre, no un error 500. */
+    /** Errores del cliente (parámetro obligatorio ausente o JSON mal escrito) responden 400, nunca un error 500. */
     @Test
-    void missingRequiredParametersAreClientErrorsNotServerErrors() throws Exception {
+    void clientErrorsReturn400NotServerErrors() throws Exception {
         mvc.perform(get("/api/loans/active").param("memberId", "1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", is("Falta el parámetro obligatorio 'bookId'")));
@@ -324,6 +315,10 @@ class LibraryApiIntegrationTest extends IntegrationTest {
         mvc.perform(get("/api/books/duplicates").param("title", "Dune"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", is("Falta el parámetro obligatorio 'author'")));
+
+        // Un JSON mal escrito también es un error del cliente.
+        mvc.perform(post("/api/books").contentType(MediaType.APPLICATION_JSON).content("{no es json"))
+                .andExpect(status().isBadRequest());
     }
 
     // ---- helpers -----------------------------------------------------------------------
