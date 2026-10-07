@@ -24,6 +24,38 @@ export type MemberInput = Pick<Member, 'name' | 'email'>;
 
 export type LoanStatus = 'ACTIVE' | 'OVERDUE' | 'RETURNED';
 
+/** Filtro de estado del historial (ALL = sin filtrar). */
+export type LoanStatusFilter = 'ALL' | LoanStatus;
+export type LoanSortField = 'bookTitle' | 'memberName' | 'loanDate' | 'dueDate' | 'status';
+
+/** Página de resultados tal como la devuelve la API. */
+export interface PageResponse<T> {
+  content: T[];
+  /** Página actual, empezando en 0. */
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** Criterios de búsqueda del historial de préstamos (se envían como query params). */
+export interface LoanQueryParams {
+  status: LoanStatusFilter;
+  q: string;
+  sort: LoanSortField;
+  direction: 'asc' | 'desc';
+  page: number;
+  size: number;
+}
+
+/** Contadores por estado (pestañas e indicadores). */
+export interface LoanSummary {
+  total: number;
+  active: number;
+  overdue: number;
+  returned: number;
+}
+
 export interface Loan {
   id: number;
   bookId: number;

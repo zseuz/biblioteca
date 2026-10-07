@@ -1,6 +1,7 @@
 package com.biblioteca.repository;
 
 import com.biblioteca.domain.Loan;
+import com.biblioteca.dto.LoanSummary;
 import com.biblioteca.dto.MemberLoanCount;
 import com.biblioteca.dto.MonthCount;
 import com.biblioteca.dto.StatEntry;
@@ -12,11 +13,22 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface LoanRepository extends JpaRepository<Loan, Long> {
+/**
+ * Acceso a préstamos. La búsqueda paginada del historial está en {@link LoanSearchRepository}
+ * (consulta dinámica según los filtros activos).
+ */
+public interface LoanRepository extends JpaRepository<Loan, Long>, LoanSearchRepository {
 
-    /** Historial completo con libro y usuario en una sola consulta (evita el problema N+1). */
-    @Query("select l from Loan l join fetch l.book join fetch l.member order by l.loanDate desc, l.id desc")
-    List<Loan> findAllWithDetails();
+    /** Contadores por estado en una sola consulta (pestañas e indicadores de la pantalla de préstamos). */
+    @Query("""
+            select new com.biblioteca.dto.LoanSummary(
+                count(l),
+                count(case when l.returnDate is null and l.dueDate >= :today then 1 end),
+                count(case when l.returnDate is null and l.dueDate < :today then 1 end),
+                count(case when l.returnDate is not null then 1 end))
+            from Loan l
+            """)
+    LoanSummary summary(@Param("today") LocalDate today);
 
     /** Un préstamo con sus relaciones ya cargadas, listo para mapearse a DTO. */
     @Query("select l from Loan l join fetch l.book join fetch l.member where l.id = :id")
