@@ -60,6 +60,12 @@ class LibraryApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalBooks", is(1)))
                 .andExpect(jsonPath("$.activeLoans", is(0)))
+                .andExpect(jsonPath("$.returnedLoans", is(1)))
+                // Serie continua de 6 meses terminando en el actual, con el préstamo de hoy.
+                .andExpect(jsonPath("$.loansByMonth", hasSize(6)))
+                .andExpect(jsonPath("$.loansByMonth[5].label", is(java.time.YearMonth.now().toString())))
+                .andExpect(jsonPath("$.loansByMonth[5].count", is(1)))
+                .andExpect(jsonPath("$.loansByMonth[0].count", is(0)))
                 .andExpect(jsonPath("$.topBooks", hasSize(1)))
                 .andExpect(jsonPath("$.topBooks[0].label", is("Dune")))
                 .andExpect(jsonPath("$.topBooks[0].count", is(1)))
@@ -73,6 +79,26 @@ class LibraryApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fields.title").exists())
                 .andExpect(jsonPath("$.fields.totalCopies").exists());
+    }
+
+    @Test
+    void memberNameLongerThan100CharsIsRejected() throws Exception {
+        String longName = "A".repeat(101);
+
+        mvc.perform(post("/api/members").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"%s\",\"email\":\"largo@example.com\"}".formatted(longName)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.name", is("El nombre no puede superar los 100 caracteres")));
+
+        // Exactamente 100 caracteres sí es válido.
+        createMember("B".repeat(100), "justo@example.com");
+    }
+
+    @Test
+    void memberNameWithDigitsOrSingleCharIsAccepted() throws Exception {
+        // No se bloquean: la interfaz pide confirmación, pero pueden ser nombres legítimos.
+        createMember("Juan Pablo 2", "jp2@example.com");
+        createMember("X", "x@example.com");
     }
 
     @Test
