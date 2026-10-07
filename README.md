@@ -35,7 +35,6 @@
 13. [Estructura del proyecto](#estructura-del-proyecto)
 14. [Configuración](#configuración)
 15. [Solución de problemas](#solución-de-problemas)
-16. [Decisiones técnicas](#decisiones-técnicas)
 
 ---
 
@@ -606,20 +605,3 @@ La URL de la API que usa el frontend está en `frontend/src/app/core/api.service
 | Error de CORS en la consola del navegador | El frontend usa otro puerto u origen | Ajusta `CORS_ALLOWED_ORIGINS` |
 | Quiero empezar con los datos de ejemplo limpios | — | Detén el backend, borra `backend/data/` y arráncalo de nuevo |
 | Las gráficas aparecen vacías | Base de datos sin historial | Registra préstamos o reinicia los datos de ejemplo |
-
----
-
-## Decisiones técnicas
-
-- **Arquitectura en capas** (controlador → servicio → repositorio) con **DTOs**: las entidades nunca salen de la transacción, así que no hay errores de carga perezosa ni consultas ocultas.
-- **Sin N+1:** el historial se carga con `join fetch`, y los contadores por usuario y las estadísticas se agregan en la base de datos con una sola consulta.
-- **Concurrencia segura:** bloqueo optimista (`@Version`) en libros y préstamos. Dos préstamos simultáneos del último ejemplar terminan en `409`, nunca en stock negativo. Lo verifica un test con 10 hilos simultáneos; como prueba de control, sin `@Version` ese test falla.
-- **Historial paginado en el servidor:** filtros, búsqueda y orden en una consulta JPQL con `join fetch` y desempate por id (paginación estable). El orden se elige de una lista blanca y el texto va siempre como parámetro, así que no hay riesgo de inyección. El frontend cancela las peticiones obsoletas (`switchMap`) y aplica la búsqueda al dejar de escribir.
-- **Índices** en las columnas que usan las reglas y los informes.
-- **Reloj inyectado (`Clock`)** para probar fechas de forma determinista.
-- **Errores uniformes** y sin filtrar detalles internos; los `500` se registran con la traza completa en el log.
-- **Operación:** `/actuator/health` con *probes*, apagado ordenado y compresión de respuestas JSON.
-- **API documentada con OpenAPI (Swagger UI)**, generada desde el código, con un esquema común para los errores (`ApiError`).
-- **Frontend:** componentes standalone con `OnPush` y signals, carga diferida por ruta, interceptor de errores, gráficas propias en SVG (sin librerías) con una paleta validada para daltonismo y contraste, y diseño accesible (teclado, `aria-*`, vista de tabla para las gráficas).
-
-**Fuera del alcance de esta prueba (decisión consciente):** autenticación (Spring Security), una base de datos de servidor (se mantiene H2 para que funcione sin instalar nada) y migraciones versionadas con Flyway. Serían los siguientes pasos para llevarlo a producción.
