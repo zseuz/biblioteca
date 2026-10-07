@@ -19,13 +19,11 @@ import com.biblioteca.repository.MemberRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import org.junit.jupiter.api.BeforeEach;
+import com.biblioteca.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -33,10 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * e historial. Los préstamos se crean con fechas pasadas directamente en la BD (la API siempre usa
  * hoy). Solo se puede renovar cuando faltan 5 días o menos para el vencimiento.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class LoanRenewalIntegrationTest {
+class LoanRenewalIntegrationTest extends IntegrationTest {
 
     @Autowired
     private MockMvc mvc;
@@ -139,7 +134,7 @@ class LoanRenewalIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message", containsString("devuelto")));
 
-        mvc.perform(post("/api/loans/{id}/renew", 999)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/loans/{id}/renew", 999_999)).andExpect(status().isNotFound());
     }
 
     @Test
@@ -173,7 +168,7 @@ class LoanRenewalIntegrationTest {
                 .andExpect(jsonPath("$.renewals[0].newDueDate", is(today.plusDays(14).toString())))
                 .andExpect(jsonPath("$.renewals[0].daysAdded", is(10)));
 
-        mvc.perform(get("/api/loans/{id}/renewals", 999)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/loans/{id}/renewals", 999_999)).andExpect(status().isNotFound());
     }
 
     @Test
