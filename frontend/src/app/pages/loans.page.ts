@@ -325,9 +325,10 @@ export type SortOrder = 'asc' | 'desc';
       }
     </section>
 
-    <!-- Modal Registrar Préstamo -->
+    <!-- Modal Registrar Préstamo. Se oculta mientras se muestra el aviso de préstamo repetido
+         (conserva lo elegido) y reaparece si se cancela el aviso. -->
     <app-modal
-      [open]="isModalOpen()"
+      [open]="isModalOpen() && !repeat()"
       title="Registrar nuevo préstamo"
       subtitle="Asigna un ejemplar a un socio registrado"
       size="lg"
