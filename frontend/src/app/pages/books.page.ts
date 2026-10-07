@@ -9,6 +9,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
 import { messageFor } from '../core/error.interceptor';
 import { mergeGenres } from '../core/genres';
@@ -33,6 +34,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
 @Component({
   selector: 'app-books-page',
   imports: [
+    RouterLink,
     ReactiveFormsModule,
     IconComponent,
     ActionMenuComponent,
@@ -191,6 +193,14 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
             <app-skeleton height="2.2rem" />
           </div>
         </div>
+      } @else if (loadError()) {
+        <app-empty-state
+          icon="alert"
+          title="No se pudieron cargar los libros"
+          message="No hay conexión con el servidor. Comprueba que el backend esté encendido e inténtalo de nuevo."
+          actionLabel="Reintentar"
+          (action)="load()"
+        />
       } @else if (filteredBooks().length === 0) {
         @if (books().length === 0 && !query().trim()) {
           <app-empty-state
@@ -511,6 +521,16 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
           <span>{{ quickLoanBook()?.availableCopies }} copias disponibles actualmente</span>
         </div>
 
+        @if (membersLoaded() && membersList().length === 0) {
+          <div class="missing-data" role="status">
+            <app-icon name="info" [size]="16" />
+            <div>
+              <strong>Aún no hay usuarios registrados.</strong>
+              <span>Para prestar este libro, primero registra al usuario. <a routerLink="/usuarios">Ir a Usuarios</a></span>
+            </div>
+          </div>
+        }
+
         <div class="form-group">
           <label for="quick-loan-member">Usuario que recibe el libro *</label>
           <app-combobox
@@ -518,7 +538,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
             [formControl]="quickLoanMember"
             [options]="memberOptions()"
             placeholder="Escribe el nombre o correo, o despliega la lista..."
-            emptyText="Ningún usuario coincide con la búsqueda"
+            [emptyText]="membersList().length ? 'Ningún usuario coincide con la búsqueda' : 'Aún no hay usuarios registrados'"
           />
         </div>
       </div>
@@ -592,6 +612,32 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
     .char-count.over {
       color: var(--danger);
       font-weight: 700;
+    }
+    /* Aviso dentro de un formulario cuando faltan datos para poder usarlo */
+    .missing-data {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-subtle);
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+    .missing-data app-icon {
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+      color: var(--primary);
+    }
+    .missing-data div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .missing-data a {
+      color: var(--primary);
+      font-weight: 600;
     }
     .genre-tag {
       display: inline-block;
@@ -867,6 +913,10 @@ export class BooksPage implements OnInit {
     this.membersList().map((m) => ({ value: m.id, label: m.name, description: m.email })),
   );
   readonly membersList = signal<Member[]>([]);
+  /** Ya se consultaron los usuarios para el préstamo rápido (para no avisar "no hay" mientras carga). */
+  readonly membersLoaded = signal(false);
+  /** La última carga del catálogo falló (sin conexión con el servidor). */
+  readonly loadError = signal(false);
   readonly quickLoanSubmitting = signal(false);
 
   // Opciones del menú de acciones. Son constantes (misma referencia en cada render) para que
@@ -1030,9 +1080,13 @@ export class BooksPage implements OnInit {
     this.api.listBooks(this.query()).subscribe({
       next: (books) => {
         this.books.set(books);
+        this.loadError.set(false);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.loadError.set(true); // sin conexión: no se dice "no hay libros" porque no se sabe
+        this.loading.set(false);
+      },
     });
   }
 
@@ -1194,7 +1248,10 @@ export class BooksPage implements OnInit {
     // Carga lista de usuarios si no está cargada
     if (this.membersList().length === 0) {
       this.api.listMembers().subscribe({
-        next: (list) => this.membersList.set(list),
+        next: (list) => {
+          this.membersList.set(list);
+          this.membersLoaded.set(true);
+        },
       });
     }
   }

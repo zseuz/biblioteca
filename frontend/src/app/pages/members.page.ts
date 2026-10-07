@@ -127,6 +127,14 @@ export type SortOrder = 'asc' | 'desc';
             <app-skeleton height="2.2rem" />
           </div>
         </div>
+      } @else if (loadError()) {
+        <app-empty-state
+          icon="alert"
+          title="No se pudieron cargar los usuarios"
+          message="No hay conexión con el servidor. Comprueba que el backend esté encendido e inténtalo de nuevo."
+          actionLabel="Reintentar"
+          (action)="load()"
+        />
       } @else if (filteredMembers().length === 0) {
         @if (members().length === 0) {
           <app-empty-state
@@ -644,11 +652,18 @@ export class MembersPage implements OnInit {
     this.api.listMembers().subscribe({
       next: (members) => {
         this.members.set(members);
+        this.loadError.set(false);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.loadError.set(true); // sin conexión: no se dice "no hay usuarios" porque no se sabe
+        this.loading.set(false);
+      },
     });
   }
+
+  /** La última carga de usuarios falló (sin conexión con el servidor). */
+  readonly loadError = signal(false);
 
   openCreate(): void {
     this.editing.set(null);

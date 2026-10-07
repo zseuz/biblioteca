@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { API_URL } from '../core/api.service';
 import { NotifyService } from '../core/notify.service';
 import { Loan, PageResponse } from '../core/models';
@@ -69,7 +70,7 @@ describe('LoansPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [LoansPage],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
   });
@@ -410,4 +411,43 @@ describe('LoansPage', () => {
       expect(TestBed.inject(NotifyService).notice()).toBeNull(); // sin aviso duplicado detrás
     });
   });
+
+  describe('sin datos o sin conexión', () => {
+    it('si el servidor no responde, avisa del error en lugar de decir que no hay préstamos', async () => {
+      const fixture = TestBed.createComponent(LoansPage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      flushAuxiliary();
+      http.expectOne(isLoansSearch).error(new ProgressEvent('error'));
+      await fixture.whenStable();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('No se pudieron cargar los préstamos');
+      expect(text).not.toContain('Todavía no hay préstamos');
+    });
+
+    it('el formulario avisa si faltan usuarios o libros disponibles y no deja prestar', async () => {
+      const fixture = TestBed.createComponent(LoansPage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      http.expectOne(`${API_URL}/loans/summary`).flush({ total: 0, active: 0, overdue: 0, returned: 0 });
+      http.expectOne(`${API_URL}/members`).flush([]);
+      http.expectOne((r) => r.url === `${API_URL}/books`).flush([]);
+      http.expectOne(isLoansSearch).flush(page([]));
+      await fixture.whenStable();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Todavía no hay préstamos');
+
+      fixture.componentInstance.openCreateModal();
+      await fixture.whenStable();
+
+      const notice = document.querySelector('.missing-data')?.textContent ?? '';
+      expect(notice).toContain('Aún no hay usuarios registrados');
+      expect(notice).toContain('No hay libros con ejemplares disponibles');
+      const lendButton = Array.from(document.querySelectorAll<HTMLButtonElement>('app-modal button')).find(
+        (b) => b.textContent?.trim() === 'Prestar libro',
+      );
+      expect(lendButton?.disabled).toBe(true);
+    });
+  });
+
 });
