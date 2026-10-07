@@ -26,11 +26,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class BookService {
 
+    /** Registro de altas, cambios y bajas de libros en la consola. */
     private static final Logger log = LoggerFactory.getLogger(BookService.class);
 
+    /** Acceso a la tabla de libros. */
     private final BookRepository books;
+    /** Acceso a préstamos: para saber si un libro tiene historial antes de borrarlo. */
     private final LoanRepository loans;
 
+    /**
+     * Spring inyecta los repositorios por constructor. Así son {@code final} y en las pruebas
+     * se pueden pasar simulaciones con un simple {@code new}.
+     */
     public BookService(BookRepository books, LoanRepository loans) {
         this.books = books;
         this.loans = loans;
@@ -142,6 +149,7 @@ public class BookService {
         log.info("Libro eliminado id={}", id);
     }
 
+    /** Busca el libro o lanza {@link NotFoundException} (que la API convierte en 404). */
     private Book find(Long id) {
         return books.findById(id).orElseThrow(() -> new NotFoundException("Libro no encontrado: " + id));
     }

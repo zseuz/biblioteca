@@ -45,14 +45,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class LoanService {
 
+    /** Registro de préstamos, devoluciones y renovaciones en la consola. */
     private static final Logger log = LoggerFactory.getLogger(LoanService.class);
 
+    /** Repositorios que usa el servicio: préstamos, libros y usuarios. */
     private final LoanRepository loans;
     private final BookRepository books;
     private final MemberRepository members;
+    /**
+     * Reglas configurables (plazo, máximo de préstamos y ventana de renovación), leídas de
+     * {@code application.properties}.
+     */
     private final LibraryProperties.Loans rules;
+    /** Reloj inyectado: en la app es el real; en las pruebas uno fijo, para poder probar fechas. */
     private final Clock clock;
 
+    /** Inyección por constructor de todas las dependencias (facilita las pruebas con simulaciones). */
     public LoanService(LoanRepository loans, BookRepository books, MemberRepository members,
                        LibraryProperties properties, Clock clock) {
         this.loans = loans;
@@ -133,6 +141,10 @@ public class LoanService {
         return new LoanRenewalHistory(LoanResponse.from(loan, today(), rules.renewalWindowDays()), originalDueDate, entries, unrecorded);
     }
 
+    /**
+     * Busca el préstamo con su libro y usuario ya cargados (join fetch), o lanza
+     * {@link NotFoundException} (404).
+     */
     private Loan findWithDetails(Long loanId) {
         return loans.findByIdWithDetails(loanId)
                 .orElseThrow(() -> new NotFoundException("Préstamo no encontrado: " + loanId));
@@ -193,6 +205,7 @@ public class LoanService {
         return LoanResponse.from(loan, today, rules.renewalWindowDays());
     }
 
+    /** Fecha de hoy según el reloj inyectado (nunca {@code LocalDate.now()} directo). */
     private LocalDate today() {
         return LocalDate.now(clock);
     }

@@ -32,12 +32,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/books")
 public class BookController {
 
+    /** Servicio con la lógica de libros; el controlador solo traduce HTTP ↔ Java. */
     private final BookService service;
 
+    /** Spring inyecta el servicio por constructor. */
     public BookController(BookService service) {
         this.service = service;
     }
 
+    /** GET /api/books?q=texto → lista de libros (todos si no hay texto), ordenados por título. */
     @Operation(summary = "Listar o buscar libros",
             description = "Sin `q` devuelve todo el catálogo ordenado por título. Con `q` busca en título, "
                     + "autor y género sin distinguir mayúsculas.")
@@ -47,6 +50,10 @@ public class BookController {
         return service.search(q);
     }
 
+    /**
+     * GET /api/books/duplicates → la web lo consulta antes de crear un libro para avisar de
+     * duplicados (mismo libro, o mismo título y autor con otro género).
+     */
     @Operation(summary = "Comprobar si un libro ya existe",
             description = "Antes de registrar un libro: `sameBook` es el que tiene el mismo título, autor y género "
                     + "(se le pueden añadir ejemplares) y `differentGenre` los que solo cambian en el género. "
@@ -59,6 +66,7 @@ public class BookController {
         return service.checkDuplicates(title, author, genre);
     }
 
+    /** POST /api/books/{id}/copies → suma ejemplares (lo usa el aviso de libro duplicado). */
     @Operation(summary = "Añadir ejemplares a un libro existente",
             description = "Incrementa el total y los disponibles. Es la alternativa a registrar de nuevo un libro que ya existe.")
     @ApiResponse(responseCode = "200", description = "Libro con los ejemplares actualizados")
@@ -70,6 +78,7 @@ public class BookController {
         return service.addCopies(id, request.quantity());
     }
 
+    /** GET /api/books/{id} → un libro concreto, o 404 si no existe. */
     @Operation(summary = "Obtener un libro")
     @ApiResponse(responseCode = "200", description = "Libro encontrado")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -78,6 +87,7 @@ public class BookController {
         return service.get(id);
     }
 
+    /** POST /api/books → crea el libro (201). @Valid valida el cuerpo antes de entrar al método. */
     @Operation(summary = "Crear un libro", description = "Todos los ejemplares quedan disponibles. No se permite "
             + "registrar dos veces el mismo título, autor y género: en ese caso hay que añadir ejemplares.")
     @ApiResponse(responseCode = "201", description = "Libro creado")
@@ -90,6 +100,7 @@ public class BookController {
         return service.create(request);
     }
 
+    /** PUT /api/books/{id} → cambia los datos del libro conservando los ejemplares prestados. */
     @Operation(summary = "Editar un libro", description = "Conserva los ejemplares que están prestados.")
     @ApiResponse(responseCode = "200", description = "Libro actualizado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -101,6 +112,7 @@ public class BookController {
         return service.update(id, request);
     }
 
+    /** DELETE /api/books/{id} → borra el libro (204) si nunca se prestó; si tiene historial, 409. */
     @Operation(summary = "Eliminar un libro", description = "Solo libros sin historial de préstamos.")
     @ApiResponse(responseCode = "204", description = "Libro eliminado")
     @ApiResponse(responseCode = "404", description = "No existe", content = @Content(schema = @Schema(implementation = ApiError.class)))

@@ -17,13 +17,28 @@ import {
   Stats,
 } from './models';
 
-/** URL base de la API: localhost en desarrollo, el backend publicado en producción. */
+/**
+ * Dirección base de la API: sale de src/environments/ (environment.development.ts con
+ * localhost para ng serve; environment.ts con el backend publicado en Render para el build).
+ */
 export const API_URL = environment.apiUrl;
 
+/**
+ * Marca una petición para que el interceptor NO muestre su error en el aviso general, porque
+ * la pantalla lo mostrará en su propio contexto (por ejemplo, dentro de un diálogo).
+ */
 const silentErrors = () => new HttpContext().set(SILENT_ERRORS, true);
 
+/**
+ * Único lugar de la app que habla con el backend. Cada método corresponde a un endpoint y
+ * devuelve un Observable: la petición se envía cuando alguien hace subscribe(). Las pantallas no
+ * construyen URLs; si la API cambia, se corrige solo aquí.
+ *
+ * {@code providedIn: 'root'}: Angular crea una sola instancia compartida por toda la app.
+ */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
+  /** Cliente HTTP de Angular; las peticiones pasan por el interceptor de errores. */
   private readonly http = inject(HttpClient);
 
   // Libros
@@ -31,13 +46,14 @@ export class ApiService {
     const params = q.trim() ? new HttpParams().set('q', q.trim()) : undefined;
     return this.http.get<Book[]>(`${API_URL}/books`, { params });
   }
+  /** POST /books: crea un libro. */
   createBook(book: BookInput): Observable<Book> {
     return this.http.post<Book>(`${API_URL}/books`, book);
   }
+  /** PUT /books/{id}: guarda los cambios de un libro. */
   updateBook(id: number, book: BookInput): Observable<Book> {
     return this.http.put<Book>(`${API_URL}/books/${id}`, book);
   }
-  /** El error (p. ej. 409 por historial) lo muestra el diálogo de confirmación, no el aviso global. */
   /** Comprueba si el libro ya está registrado (sin distinguir mayúsculas ni espacios). */
   checkBookDuplicates(book: Pick<BookInput, 'title' | 'author' | 'genre'>): Observable<BookDuplicateCheck> {
     const params = new HttpParams()
@@ -50,6 +66,7 @@ export class ApiService {
   addCopies(id: number, quantity: number): Observable<Book> {
     return this.http.post<Book>(`${API_URL}/books/${id}/copies`, { quantity });
   }
+  /** El error (p. ej. 409 por historial) lo muestra el diálogo de confirmación, no el aviso global. */
   deleteBook(id: number): Observable<void> {
     return this.http.delete<void>(`${API_URL}/books/${id}`, { context: silentErrors() });
   }
@@ -62,6 +79,7 @@ export class ApiService {
   createMember(member: MemberInput): Observable<Member> {
     return this.http.post<Member>(`${API_URL}/members`, member, { context: silentErrors() });
   }
+  /** PUT /members/{id}: guarda los cambios; el correo repetido se muestra en el formulario. */
   updateMember(id: number, member: MemberInput): Observable<Member> {
     return this.http.put<Member>(`${API_URL}/members/${id}`, member, { context: silentErrors() });
   }
@@ -89,6 +107,7 @@ export class ApiService {
   loanSummary(): Observable<LoanSummary> {
     return this.http.get<LoanSummary>(`${API_URL}/loans/summary`);
   }
+  /** POST /loans: registra un préstamo; si una regla falla, el interceptor muestra el motivo. */
   lend(bookId: number, memberId: number): Observable<Loan> {
     return this.http.post<Loan>(`${API_URL}/loans`, { bookId, memberId });
   }
@@ -97,7 +116,6 @@ export class ApiService {
     const params = new HttpParams().set('memberId', memberId).set('bookId', bookId);
     return this.http.get<Loan[]>(`${API_URL}/loans/active`, { params });
   }
-  /** Renueva un préstamo en plazo: vuelve a tener 14 días desde hoy. */
   /**
    * Renueva un préstamo en plazo: vuelve a tener 14 días desde hoy.
    * Con {@code silent} el error no se muestra como aviso global (lo presenta quien llama).
@@ -109,6 +127,7 @@ export class ApiService {
   renewalHistory(id: number): Observable<LoanRenewalHistory> {
     return this.http.get<LoanRenewalHistory>(`${API_URL}/loans/${id}/renewals`);
   }
+  /** POST /loans/{id}/return: registra la devolución. */
   giveBack(id: number): Observable<Loan> {
     return this.http.post<Loan>(`${API_URL}/loans/${id}/return`, {});
   }

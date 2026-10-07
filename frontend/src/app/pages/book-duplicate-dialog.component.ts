@@ -184,15 +184,18 @@ export class BookDuplicateDialogComponent {
   /** Volver al formulario sin hacer nada. */
   readonly back = output<void>();
 
+  /** Géneros con los que ya existe el libro (para mostrar la diferencia). */
   protected readonly existingGenres = computed(() => {
     const dup = this.duplicate();
     return dup?.kind === 'genre' ? dup.existing.map((b) => b.genre).join(', ') : '';
   });
 
+  /** Concordancia en singular o plural: «1 disponible», «3 disponibles». */
   protected available(n: number): string {
     return `${n} ${n === 1 ? 'disponible' : 'disponibles'}`;
   }
 
+  /** «1 ejemplar», «3 ejemplares». */
   protected copies(n: number): string {
     return `${n} ${n === 1 ? 'ejemplar' : 'ejemplares'}`;
   }

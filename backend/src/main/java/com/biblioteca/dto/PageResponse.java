@@ -16,6 +16,10 @@ import java.util.function.Function;
  */
 public record PageResponse<T>(List<T> content, int page, int size, long totalElements, int totalPages) {
 
+    /**
+     * Crea la página calculando el número total de páginas a partir del total de elementos
+     * (por ejemplo, 33 préstamos de 10 en 10 son 4 páginas).
+     */
     public static <T> PageResponse<T> of(List<T> content, int page, int size, long totalElements) {
         int totalPages = size == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
         return new PageResponse<>(content, page, size, totalElements, totalPages);

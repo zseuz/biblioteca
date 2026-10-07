@@ -18,6 +18,7 @@ import { ModalComponent } from './modal.component';
 @Component({
   selector: 'app-confirm-dialog',
   imports: [ModalComponent, IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal [open]="open()" [title]="title()" [subtitle]="''" size="sm" (close)="cancel.emit()">
@@ -138,19 +139,26 @@ import { ModalComponent } from './modal.component';
   `,
 })
 export class ConfirmDialogComponent {
+  /** Si el diálogo está visible. */
   readonly open = input<boolean>(false);
+  /** Título, p. ej. «Eliminar libro». */
   readonly title = input.required<string>();
+  /** Pregunta o explicación que se muestra en el centro. */
   readonly message = input.required<string>();
   /**
    * Fragmento del mensaje que se muestra en negrita (p. ej. el nombre del libro o del usuario).
    * Se resalta su primera aparición dentro de {@link message}.
    */
   readonly emphasis = input<string>('');
+  /** Texto del botón de confirmar, p. ej. «Eliminar». */
   readonly confirmText = input<string>('Confirmar');
+  /** Texto del botón de cancelar («Entendido» en los avisos informativos). */
   readonly cancelText = input<string>('Cancelar');
   /** {@code false} = diálogo solo informativo (un único botón, {@code cancelText}). */
   readonly showConfirm = input<boolean>(true);
+  /** Color: rojo para acciones destructivas, azul para el resto. */
   readonly variant = input<'danger' | 'primary'>('danger');
+  /** Mientras es true, el botón muestra un spinner y no se puede pulsar de nuevo. */
   readonly loading = input<boolean>(false);
   /** Motivo por el que falló la acción; se muestra dentro del diálogo. */
   readonly error = input<string | null>(null);
@@ -168,6 +176,8 @@ export class ConfirmDialogComponent {
     };
   });
 
+  /** El usuario confirmó la acción. */
   readonly confirm = output<void>();
+  /** El usuario canceló o cerró el diálogo. */
   readonly cancel = output<void>();
 }

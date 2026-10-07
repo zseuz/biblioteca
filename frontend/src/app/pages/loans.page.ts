@@ -36,10 +36,18 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { SkeletonComponent } from '../shared/skeleton.component';
 
+/** Pestañas de estado del historial. */
 export type LoanFilterStatus = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'RETURNED';
+/** Columnas por las que se puede ordenar el historial. */
 export type LoanSortField = 'bookTitle' | 'memberName' | 'loanDate' | 'dueDate' | 'status';
+/** Sentido del orden. */
 export type SortOrder = 'asc' | 'desc';
 
+/**
+ * Pantalla «Préstamos»: historial paginado en el servidor (filtro por estado, búsqueda sin
+ * tildes, orden), registrar un préstamo (con aviso si el usuario ya tiene ese libro), devolver,
+ * renovar (solo en los últimos 5 días) y ver el historial de renovaciones.
+ */
 @Component({
   selector: 'app-loans-page',
   imports: [
@@ -56,6 +64,7 @@ export type SortOrder = 'asc' | 'desc';
     EmptyStateComponent,
     SkeletonComponent,
   ],
+  // OnPush: Angular solo vuelve a pintar esta pantalla cuando cambian sus signals o entradas.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Encabezado de página -->
@@ -726,6 +735,7 @@ export type SortOrder = 'asc' | 'desc';
   `,
 })
 export class LoansPage implements OnInit {
+  /** Servicios: API, avisos flotantes y constructor de formularios. */
   private readonly api = inject(ApiService);
   private readonly notify = inject(NotifyService);
   private readonly fb = inject(FormBuilder);
@@ -736,22 +746,28 @@ export class LoansPage implements OnInit {
   readonly summary = signal<LoanSummary | null>(null);
   /** Hay una página en camino (la tabla anterior se muestra atenuada). */
   readonly fetching = signal(false);
+  /** Usuarios y libros disponibles para los buscadores del formulario de préstamo. */
   readonly members = signal<Member[]>([]);
   readonly availableBooks = signal<Book[]>([]);
+  /** Primera carga de la pantalla. */
   readonly loading = signal(true);
+  /** Registrando un préstamo. */
   readonly saving = signal(false);
 
   // Modales
   readonly isModalOpen = signal(false);
+  /** Estado del diálogo de devolución: si está abierto, qué préstamo y si se está enviando. */
   readonly returnDialogOpen = signal(false);
   readonly loanToReturn = signal<Loan | null>(null);
   readonly returning = signal(false);
 
   // Filtros
   readonly searchTerm = signal('');
+  /** Pestaña de estado seleccionada. */
   readonly statusFilter = signal<LoanFilterStatus>('ALL');
   /** Por defecto, los préstamos más recientes primero. */
   readonly sortField = signal<LoanSortField>('loanDate');
+  /** Sentido del orden, página actual y elementos por página. */
   readonly sortOrder = signal<SortOrder>('desc');
   readonly page = signal(0);
   readonly pageSize = signal(10);
@@ -773,6 +789,7 @@ export class LoansPage implements OnInit {
 
   /** Préstamo que se va a renovar (diálogo de confirmación). */
   readonly loanToRenew = signal<Loan | null>(null);
+  /** Renovación en curso. */
   readonly renewing = signal(false);
   /** Motivo por el que falló la renovación (se muestra dentro del diálogo). */
   readonly renewError = signal<string | null>(null);
@@ -787,6 +804,7 @@ export class LoansPage implements OnInit {
 
   /** Préstamo cuyo historial de renovaciones se está viendo, y el historial cargado. */
   readonly historyLoan = signal<Loan | null>(null);
+  /** Historial cargado (null mientras se pide al servidor). */
   readonly history = signal<LoanRenewalHistory | null>(null);
   /** Aviso de préstamo repetido (el usuario ya tiene ese libro sin devolver). */
   readonly repeat = signal<LoanRepeat | null>(null);
@@ -816,6 +834,7 @@ export class LoansPage implements OnInit {
     })),
   );
 
+  /** Formulario de préstamo: usuario y libro, los dos obligatorios. */
   readonly form = this.fb.group({
     memberId: this.fb.control<string | null>(null, Validators.required),
     bookId: this.fb.control<string | null>(null, Validators.required),
@@ -823,10 +842,12 @@ export class LoansPage implements OnInit {
 
   // Computed counters
   readonly totalLoansCount = computed(() => this.summary()?.total ?? 0);
+  /** Indicadores y contadores de las pestañas, a partir del resumen del servidor. */
   readonly activeLoansCount = computed(() => this.summary()?.active ?? 0);
   readonly overdueLoansCount = computed(() => this.summary()?.overdue ?? 0);
   readonly returnedLoansCount = computed(() => this.summary()?.returned ?? 0);
 
+  /** Préstamos de la página actual (lista vacía si aún no hay respuesta). */
   readonly pageItems = computed(() => this.result()?.content ?? []);
 
   /** Consulta completa al servidor: cualquier cambio de filtro, orden o página la vuelve a lanzar. */
@@ -867,15 +888,18 @@ export class LoansPage implements OnInit {
       });
   }
 
+  /** Al entrar: carga el resumen, los usuarios y los libros (la página del historial la pide la consulta reactiva). */
   ngOnInit(): void {
     this.load();
   }
 
+  /** Un campo muestra error si no es válido y ya se tocó. */
   invalid(name: 'memberId' | 'bookId'): boolean {
     const c = this.form.controls[name];
     return c.invalid && (c.touched || c.dirty);
   }
 
+  /** Texto del estado para la etiqueta de cada fila. */
   statusLabel(s: LoanStatus): string {
     switch (s) {
       case 'ACTIVE':
@@ -887,6 +911,7 @@ export class LoansPage implements OnInit {
     }
   }
 
+  /** Clase CSS de la etiqueta: verde (activo), rojo (vencido) o gris (devuelto). */
   statusClass(s: LoanStatus): string {
     switch (s) {
       case 'ACTIVE':
@@ -898,6 +923,10 @@ export class LoansPage implements OnInit {
     }
   }
 
+  /**
+   * Cada tecla en el buscador: espera 300 ms sin escribir antes de aplicar la búsqueda y vuelve
+   * a la página 1. Al cambiar appliedSearch, la consulta reactiva pide la página al servidor.
+   */
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     const value = target?.value ?? '';
@@ -909,6 +938,7 @@ export class LoansPage implements OnInit {
     }, 300);
   }
 
+  /** Botón × del buscador: quita la búsqueda al instante. */
   clearSearch(): void {
     clearTimeout(this.searchTimer);
     this.searchTerm.set('');
@@ -922,16 +952,19 @@ export class LoansPage implements OnInit {
     this.page.set(0);
   }
 
+  /** Cambio de página desde el paginador (y sube hasta el inicio de la tabla). */
   goToPage(page: number): void {
     this.page.set(page);
     document.querySelector('.loans-section')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
   }
 
+  /** Cambio de «Por página»: vuelve a la primera página. */
   changePageSize(size: number): void {
     this.pageSize.set(size);
     this.page.set(0);
   }
 
+  /** Clic en una cabecera: ordena por esa columna (las fechas empiezan por la más reciente). */
   toggleSort(field: LoanSortField): void {
     if (this.sortField() === field) {
       this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
@@ -943,11 +976,13 @@ export class LoansPage implements OnInit {
     this.page.set(0);
   }
 
+  /** Flecha de la cabecera según el orden actual. */
   getSortIcon(field: LoanSortField): 'sort' | 'arrow-up' | 'arrow-down' {
     if (this.sortField() !== field) return 'sort';
     return this.sortOrder() === 'asc' ? 'arrow-up' : 'arrow-down';
   }
 
+  /** Quita búsqueda y filtro de estado. */
   resetFilters(): void {
     clearTimeout(this.searchTimer);
     this.searchTerm.set('');
@@ -956,6 +991,7 @@ export class LoansPage implements OnInit {
     this.page.set(0);
   }
 
+  /** Recarga resumen, usuarios y libros, y vuelve a pedir la página actual (tras prestar, devolver o renovar). */
   load(): void {
     this.loading.set(true);
     // La página del historial la pide la consulta reactiva; aquí se recargan los datos auxiliares.
@@ -976,16 +1012,22 @@ export class LoansPage implements OnInit {
     });
   }
 
+  /** Abre el formulario de préstamo vacío. */
   openCreateModal(): void {
     this.form.reset();
     this.isModalOpen.set(true);
   }
 
+  /** Cierra el formulario de préstamo y lo limpia. */
   closeModal(): void {
     this.isModalOpen.set(false);
     this.form.reset();
   }
 
+  /**
+   * «Prestar libro»: valida y primero pregunta al servidor si el usuario ya tiene ese libro sin
+   * devolver; si lo tiene, muestra el aviso de préstamo repetido en lugar de prestar.
+   */
   lend(): void {
     if (this.form.invalid) {
       this.isModalOpen.set(true);
@@ -1042,6 +1084,10 @@ export class LoansPage implements OnInit {
     this.loanToRenew.set(loan);
   }
 
+  /**
+   * Confirma la renovación. Si el servidor la rechaza, el motivo se muestra dentro del diálogo
+   * (la petición va con silent para no duplicarlo en el aviso general).
+   */
   confirmRenew(): void {
     const loan = this.loanToRenew();
     if (!loan || this.renewBlocked()) return;
@@ -1073,10 +1119,12 @@ export class LoansPage implements OnInit {
     });
   }
 
+  /** Aviso de renovación correcta con la nueva fecha límite. */
   private notifyRenewed(loan: Loan): void {
     this.notify.ok(`Préstamo de «${loan.bookTitle}» renovado: ahora vence el ${this.formatDate(loan.dueDate)}`);
   }
 
+  /** Registra el préstamo en el servidor, cierra el formulario y recarga los datos. */
   private doLend(bookId: number, memberId: number): void {
     this.saving.set(true);
     this.api.lend(bookId, memberId).subscribe({
@@ -1099,11 +1147,13 @@ export class LoansPage implements OnInit {
     }
   }
 
+  /** Menú ⋮ → Registrar devolución: abre la confirmación. */
   promptReturn(loan: Loan): void {
     this.loanToReturn.set(loan);
     this.returnDialogOpen.set(true);
   }
 
+  /** Confirma la devolución y recarga la pantalla. */
   confirmReturn(): void {
     const loan = this.loanToReturn();
     if (!loan) return;
@@ -1123,15 +1173,18 @@ export class LoansPage implements OnInit {
     });
   }
 
+  /** Cierra el diálogo de devolución sin hacer nada. */
   cancelReturn(): void {
     this.returnDialogOpen.set(false);
     this.loanToReturn.set(null);
   }
 
+  /** Atajo para iniciar la devolución de un préstamo. */
   giveBack(loan: Loan): void {
     this.promptReturn(loan);
   }
 
+  /** Fecha ISO del servidor ("2026-10-07") en formato de lectura: 07/10/2026. */
   formatDate(dateStr: string): string {
     if (!dateStr) return '—';
     try {
@@ -1145,6 +1198,7 @@ export class LoansPage implements OnInit {
     return dateStr;
   }
 
+  /** Texto bajo la fecha límite: «Quedan 5 días», «Vence hoy», «Vencido hace 3 días»… */
   getDaysRelativeText(dueDateStr: string, status: LoanStatus): string {
     if (status === 'RETURNED' || !dueDateStr) return '';
     const now = new Date();
@@ -1165,6 +1219,7 @@ export class LoansPage implements OnInit {
     }
   }
 
+  /** Iniciales del usuario para el avatar de la fila. */
   getInitials(name: string): string {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/);

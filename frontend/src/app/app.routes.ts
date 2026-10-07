@@ -1,5 +1,10 @@
 import { Routes } from '@angular/router';
 
+/**
+ * Rutas de la aplicación. Cada pantalla se carga de forma diferida (loadComponent): su código
+ * se descarga solo la primera vez que se entra en ella. «title» cambia el título de la pestaña.
+ * La ruta vacía y cualquier ruta desconocida (**) llevan a Libros.
+ */
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'libros' },
   {

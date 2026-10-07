@@ -1,9 +1,15 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { IconComponent, IconName } from './icon.component';
 
+/**
+ * Mensaje para cuando no hay nada que mostrar: lista vacía, búsqueda sin resultados o error
+ * de conexión. Muestra un icono, un título, una explicación y, opcionalmente, un botón de acción
+ * («Agregar libro», «Limpiar filtros», «Reintentar»).
+ */
 @Component({
   selector: 'app-empty-state',
   imports: [IconComponent],
+  // OnPush: Angular solo vuelve a pintar este componente cuando cambian sus entradas o sus signals.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="empty-state-box">
@@ -72,9 +78,14 @@ import { IconComponent, IconName } from './icon.component';
   `,
 })
 export class EmptyStateComponent {
+  /** Icono grande de la parte superior. */
   readonly icon = input<IconName>('book-open');
+  /** Título, p. ej. «No hay libros registrados». */
   readonly title = input.required<string>();
+  /** Explicación debajo del título. */
   readonly message = input<string>('');
+  /** Texto del botón; si está vacío no se muestra botón. */
   readonly actionLabel = input<string>('');
+  /** Se emite al pulsar el botón. */
   readonly action = output<void>();
 }

@@ -24,10 +24,12 @@ import java.util.Objects;
 @Table(name = "loan_renewal", indexes = @Index(name = "idx_renewal_loan", columnList = "loan_id, renewedAt"))
 public class LoanRenewal {
 
+    /** Identificador de la renovación, generado por la base de datos. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Préstamo al que pertenece la renovación (un préstamo puede tener muchas). */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private Loan loan;
 
@@ -54,17 +56,20 @@ public class LoanRenewal {
         this.newDueDate = newDueDate;
     }
 
+    /** Getters de solo lectura: una renovación no se modifica después de registrarse. */
     public Long getId() { return id; }
     public Loan getLoan() { return loan; }
     public LocalDateTime getRenewedAt() { return renewedAt; }
     public LocalDate getPreviousDueDate() { return previousDueDate; }
     public LocalDate getNewDueDate() { return newDueDate; }
 
+    /** Igualdad por id de base de datos. */
     @Override
     public boolean equals(Object o) {
         return this == o || (o instanceof LoanRenewal other && id != null && Objects.equals(id, other.getId()));
     }
 
+    /** Constante por clase, coherente con {@link #equals}. */
     @Override
     public int hashCode() {
         return LoanRenewal.class.hashCode();

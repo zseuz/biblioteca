@@ -27,10 +27,18 @@ import { IconComponent } from '../shared/icon.component';
 import { ModalComponent } from '../shared/modal.component';
 import { SkeletonComponent } from '../shared/skeleton.component';
 
+/** Columnas por las que se puede ordenar el catálogo. */
 export type BookSortField = 'title' | 'author' | 'genre' | 'availableCopies';
+/** Sentido del orden: ascendente (A→Z) o descendente (Z→A). */
 export type SortOrder = 'asc' | 'desc';
+/** Filtro de disponibilidad: todos, con ejemplares o agotados. */
 export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
 
+/**
+ * Pantalla «Libros»: catálogo con búsqueda (en el servidor, sin tildes), filtros por género y
+ * disponibilidad, orden por columna, vista de tabla o tarjetas, alta y edición con validación,
+ * aviso de libros duplicados, préstamo rápido y borrado protegido.
+ */
 @Component({
   selector: 'app-books-page',
   imports: [
@@ -46,6 +54,7 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
     EmptyStateComponent,
     SkeletonComponent,
   ],
+  // OnPush: Angular solo vuelve a pintar esta pantalla cuando cambian sus signals o entradas.
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Encabezado de página -->
@@ -869,19 +878,26 @@ export type AvailabilityFilter = 'all' | 'available' | 'unavailable';
   `,
 })
 export class BooksPage implements OnInit {
+  /** Servicios: API, avisos flotantes y constructor de formularios (nonNullable: reset() vuelve a los valores iniciales, no a null). */
   private readonly api = inject(ApiService);
   private readonly notify = inject(NotifyService);
   private readonly fb = inject(FormBuilder).nonNullable;
   private searchTimer?: ReturnType<typeof setTimeout>;
 
+  /** Libros recibidos del servidor (ya filtrados por la búsqueda, si la hay). */
   readonly books = signal<Book[]>([]);
+  /** Cargando el catálogo (muestra los esqueletos). */
   readonly loading = signal(true);
+  /** Guardando un libro (desactiva el botón y muestra el spinner). */
   readonly saving = signal(false);
+  /** Libro que se está editando; null = el formulario crea uno nuevo. */
   readonly editing = signal<Book | null>(null);
+  /** Texto del buscador; se envía al servidor 250 ms después de dejar de escribir. */
   readonly query = signal('');
 
   // Modales
   readonly isModalOpen = signal(false);
+  /** Estado del diálogo de borrado: si está abierto, qué libro y si se está borrando. */
   readonly deleteDialogOpen = signal(false);
   readonly bookToDelete = signal<Book | null>(null);
   readonly deleting = signal(false);
@@ -897,6 +913,7 @@ export class BooksPage implements OnInit {
 
   // Filtros y Vista
   readonly genreFilter = signal<string>('all');
+  /** Filtros y presentación que se aplican en el navegador sobre la lista cargada. */
   readonly availFilter = signal<AvailabilityFilter>('all');
   readonly viewMode = signal<'table' | 'grid'>('table');
   readonly sortField = signal<BookSortField>('title');
@@ -904,19 +921,23 @@ export class BooksPage implements OnInit {
 
   // Préstamo Rápido
   readonly quickLoanModalOpen = signal(false);
+  /** Libro que se va a prestar desde el catálogo. */
   readonly quickLoanBook = signal<Book | null>(null);
   /** Usuario elegido en el buscador del préstamo rápido. */
   readonly quickLoanMember = new FormControl<number | null>(null, Validators.required);
   /** Espejo en signal del valor anterior, para habilitar el botón con OnPush. */
   readonly selectedLoanMemberId = toSignal(this.quickLoanMember.valueChanges, { initialValue: null });
+  /** Usuarios convertidos en opciones del buscador desplegable (nombre y correo). */
   readonly memberOptions = computed<ComboboxOption[]>(() =>
     this.membersList().map((m) => ({ value: m.id, label: m.name, description: m.email })),
   );
+  /** Usuarios para el préstamo rápido; se cargan la primera vez que se abre. */
   readonly membersList = signal<Member[]>([]);
   /** Ya se consultaron los usuarios para el préstamo rápido (para no avisar "no hay" mientras carga). */
   readonly membersLoaded = signal(false);
   /** La última carga del catálogo falló (sin conexión con el servidor). */
   readonly loadError = signal(false);
+  /** Préstamo rápido en curso (spinner en «Confirmar préstamo»). */
   readonly quickLoanSubmitting = signal(false);
 
   // Opciones del menú de acciones. Son constantes (misma referencia en cada render) para que
@@ -925,6 +946,7 @@ export class BooksPage implements OnInit {
     { id: 'edit', label: 'Editar', icon: 'edit' },
     { id: 'delete', label: 'Eliminar', icon: 'trash', danger: true },
   ];
+  /** Libros con ejemplares disponibles: además de editar y eliminar, se pueden prestar. */
   readonly actionsWithLoan: ActionMenuItem[] = [
     { id: 'lend', label: 'Prestar', icon: 'loans' },
     ...this.actionsWithoutLoan,
@@ -938,6 +960,10 @@ export class BooksPage implements OnInit {
     totalCopies: LIMITS.copies,
   };
 
+  /**
+   * Formulario de alta/edición. Cada campo tiene sus validadores: obligatorio, sin solo espacios,
+   * longitud mínima y máxima (o rango y números enteros en los ejemplares), los mismos que el backend.
+   */
   readonly form = this.fb.group({
     title: ['', [Validators.required, notBlank, textLength(LIMITS.title.min, LIMITS.title.max)]],
     author: ['', [Validators.required, notBlank, textLength(LIMITS.author.min, LIMITS.author.max)]],
@@ -967,6 +993,7 @@ export class BooksPage implements OnInit {
     mergeGenres(this.books().map((b) => b.genre)).map((g) => ({ value: g, label: g })),
   );
 
+  /** Indicadores de la cabecera, calculados a partir de los libros cargados. */
   readonly totalBooksCount = computed(() => this.books().length);
 
   readonly totalAvailableCopies = computed(() =>
@@ -977,10 +1004,15 @@ export class BooksPage implements OnInit {
     this.books().reduce((acc, b) => acc + (b.totalCopies - b.availableCopies), 0),
   );
 
+  /** Contadores de las pestañas Disponibles y Agotados. */
   readonly availableCount = computed(() => this.books().filter((b) => b.available).length);
 
   readonly unavailableCount = computed(() => this.books().filter((b) => !b.available).length);
 
+  /**
+   * Lista que se muestra: los libros cargados con el filtro de género y disponibilidad y el orden
+   * elegido. Al ser computed, se recalcula sola cuando cambia cualquiera de esas signals.
+   */
   readonly filteredBooks = computed(() => {
     let result = [...this.books()];
     const genre = this.genreFilter();
@@ -1015,6 +1047,7 @@ export class BooksPage implements OnInit {
     return result;
   });
 
+  /** Al entrar en la pantalla: carga el catálogo. */
   ngOnInit(): void {
     this.load();
   }
@@ -1029,31 +1062,40 @@ export class BooksPage implements OnInit {
     return (this.form.controls[name].value ?? '').trim().length;
   }
 
+  /** Un campo muestra error si no es válido y el usuario ya lo tocó o lo modificó. */
   invalid(name: keyof typeof this.form.controls): boolean {
     const c = this.form.controls[name];
     return c.invalid && (c.touched || c.dirty);
   }
 
+  /** Cada tecla en el buscador. */
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     this.onSearch(target?.value ?? '');
   }
 
+  /**
+   * Guarda el texto y espera 250 ms antes de pedir al servidor (si se sigue escribiendo, el
+   * temporizador se reinicia): así no se hace una petición por cada letra.
+   */
   onSearch(value: string): void {
     this.query.set(value);
     clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => this.load(), 250);
   }
 
+  /** Botón × del buscador. */
   clearSearch(): void {
     this.onSearch('');
   }
 
+  /** Cambio en el selector de género. */
   onGenreChange(event: Event): void {
     const select = event.target as HTMLSelectElement | null;
     this.genreFilter.set(select?.value ?? 'all');
   }
 
+  /** Quita búsqueda y filtros y vuelve a cargar todo el catálogo. */
   resetFilters(): void {
     this.query.set('');
     this.genreFilter.set('all');
@@ -1061,6 +1103,7 @@ export class BooksPage implements OnInit {
     this.load();
   }
 
+  /** Clic en una cabecera: ordena por esa columna o invierte el sentido si ya lo estaba. */
   toggleSort(field: BookSortField): void {
     if (this.sortField() === field) {
       this.sortOrder.update((o) => (o === 'asc' ? 'desc' : 'asc'));
@@ -1070,11 +1113,13 @@ export class BooksPage implements OnInit {
     }
   }
 
+  /** Flecha de la cabecera: neutra, hacia arriba o hacia abajo según el orden actual. */
   getSortIcon(field: BookSortField): 'sort' | 'arrow-up' | 'arrow-down' {
     if (this.sortField() !== field) return 'sort';
     return this.sortOrder() === 'asc' ? 'arrow-up' : 'arrow-down';
   }
 
+  /** Pide el catálogo al servidor. Si falla, activa loadError para mostrar «No se pudieron cargar» en vez de «no hay libros». */
   load(): void {
     this.loading.set(true);
     this.api.listBooks(this.query()).subscribe({
@@ -1090,6 +1135,7 @@ export class BooksPage implements OnInit {
     });
   }
 
+  /** Abre el formulario vacío para un libro nuevo. */
   openCreate(): void {
     this.editing.set(null);
     this.form.reset({ title: '', author: '', genre: '', totalCopies: 1 });
@@ -1097,6 +1143,10 @@ export class BooksPage implements OnInit {
     setTimeout(() => document.getElementById('title')?.focus(), 50);
   }
 
+  /**
+   * Guardar: si el formulario no es válido marca los errores; si es un alta, antes consulta si el
+   * libro ya existe para avisar (duplicado exacto u otro género) en lugar de duplicarlo.
+   */
   save(): void {
     if (this.form.invalid) {
       this.isModalOpen.set(true);
@@ -1160,6 +1210,7 @@ export class BooksPage implements OnInit {
     setTimeout(() => document.getElementById('genre')?.focus(), 50);
   }
 
+  /** Envía el alta o la edición al servidor, avisa del resultado y recarga la lista. */
   private persist(value: BookInput): void {
     const current = this.editing();
     const request = current ? this.api.updateBook(current.id, value) : this.api.createBook(value);
@@ -1175,6 +1226,7 @@ export class BooksPage implements OnInit {
     });
   }
 
+  /** Abre el formulario con los datos del libro elegido. */
   edit(book: Book): void {
     this.editing.set(book);
     this.form.setValue({
@@ -1187,6 +1239,7 @@ export class BooksPage implements OnInit {
     setTimeout(() => document.getElementById('title')?.focus(), 50);
   }
 
+  /** Cierra el formulario y lo deja limpio para la próxima vez. */
   cancel(): void {
     this.isModalOpen.set(false);
     this.editing.set(null);
@@ -1208,12 +1261,14 @@ export class BooksPage implements OnInit {
     }
   }
 
+  /** Menú ⋮ → Eliminar: abre la confirmación. */
   remove(book: Book): void {
     this.bookToDelete.set(book);
     this.deleteError.set(null);
     this.deleteDialogOpen.set(true);
   }
 
+  /** Confirma el borrado. Si el servidor lo rechaza (libro con historial), el motivo se muestra dentro del diálogo. */
   confirmDelete(): void {
     const b = this.bookToDelete();
     if (!b) return;
@@ -1235,12 +1290,14 @@ export class BooksPage implements OnInit {
     });
   }
 
+  /** Cierra el diálogo de borrado sin hacer nada. */
   cancelDelete(): void {
     this.deleteDialogOpen.set(false);
     this.bookToDelete.set(null);
     this.deleteError.set(null);
   }
 
+  /** Menú ⋮ → Prestar: abre el préstamo rápido y carga los usuarios si aún no se tienen. */
   openQuickLoan(book: Book): void {
     this.quickLoanBook.set(book);
     this.quickLoanMember.reset(null);
@@ -1256,6 +1313,10 @@ export class BooksPage implements OnInit {
     }
   }
 
+  /**
+   * Confirmar el préstamo rápido: primero comprueba si el usuario ya tiene ese libro sin
+   * devolver; si es así, muestra el aviso de préstamo repetido en lugar de prestar.
+   */
   submitQuickLoan(): void {
     const book = this.quickLoanBook();
     const memberId = this.quickLoanMember.value;
@@ -1307,6 +1368,7 @@ export class BooksPage implements OnInit {
     });
   }
 
+  /** Registra el préstamo en el servidor y actualiza el catálogo (el libro tiene un ejemplar menos). */
   private doQuickLoan(book: Book, memberId: number): void {
     this.quickLoanSubmitting.set(true);
     this.api.lend(book.id, memberId).subscribe({
