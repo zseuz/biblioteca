@@ -3,6 +3,7 @@ package com.biblioteca.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -41,6 +43,8 @@ class LoanRenewalIntegrationTest {
     private MemberRepository members;
     @Autowired
     private LoanRepository loans;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private final LocalDate today = LocalDate.now();
     private Book dune;
@@ -110,5 +114,50 @@ class LoanRenewalIntegrationTest {
         mvc.perform(post("/api/loans/{id}/renew", id))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message", containsString("plazo completo")));
+    }
+
+    @Test
+    void renewalHistoryShowsTheInitialLoanAndEachRenewal() throws Exception {
+        mvc.perform(post("/api/loans/{id}/renew", inTime.getId())).andExpect(status().isOk());
+
+        mvc.perform(get("/api/loans/{id}/renewals", inTime.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.loan.loanDate", is(today.minusDays(5).toString())))
+                .andExpect(jsonPath("$.loan.renewals", is(1)))
+                .andExpect(jsonPath("$.originalDueDate", is(today.plusDays(9).toString())))
+                .andExpect(jsonPath("$.unrecordedRenewals", is(0)))
+                .andExpect(jsonPath("$.renewals", hasSize(1)))
+                .andExpect(jsonPath("$.renewals[0].number", is(1)))
+                .andExpect(jsonPath("$.renewals[0].renewedAt", startsWith(today.toString())))
+                .andExpect(jsonPath("$.renewals[0].previousDueDate", is(today.plusDays(9).toString())))
+                .andExpect(jsonPath("$.renewals[0].newDueDate", is(today.plusDays(14).toString())))
+                .andExpect(jsonPath("$.renewals[0].daysAdded", is(5)));
+
+        mvc.perform(get("/api/loans/{id}/renewals", 999)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void renewingTwiceTheSameDayIsRejectedWithTheTimeOfTheFirstRenewal() throws Exception {
+        String json = mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String time = com.jayway.jsonpath.JsonPath.<String>read(json, "$.lastRenewedAt").substring(11, 16);
+
+        mvc.perform(post("/api/loans/{id}/renew", inTime.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("ya se renovó hoy a las " + time)));
+        mvc.perform(get("/api/loans/{id}/renewals", inTime.getId()))
+                .andExpect(jsonPath("$.renewals", hasSize(1)));
+    }
+
+    @Test
+    void renewalsMadeBeforeTheHistoryExistedAreCountedWithoutDetail() throws Exception {
+        // Simula un préstamo renovado con una versión anterior (sin filas en loan_renewal).
+        jdbc.update("update loan set renewals = 2, last_renewed_on = ? where id = ?",
+                today.minusDays(1), inTime.getId());
+
+        mvc.perform(get("/api/loans/{id}/renewals", inTime.getId()))
+                .andExpect(jsonPath("$.unrecordedRenewals", is(2)))
+                .andExpect(jsonPath("$.renewals", hasSize(0)))
+                .andExpect(jsonPath("$.originalDueDate", is(today.minusDays(5).plusDays(14).toString())));
     }
 }

@@ -1,6 +1,7 @@
 package com.biblioteca.domain;
 
 import com.biblioteca.exception.BusinessRuleException;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,9 +10,16 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -62,6 +70,17 @@ public class Loan {
     /** Fecha de la última renovación ({@code null} si nunca se renovó). */
     private LocalDate lastRenewedOn;
 
+    /**
+     * Fecha y hora de la última renovación. Puede ser {@code null} aunque haya
+     * {@link #lastRenewedOn} en préstamos renovados antes de que se guardara la hora.
+     */
+    private LocalDateTime lastRenewedAt;
+
+    /** Historial de renovaciones, de la más antigua a la más reciente. */
+    @OneToMany(mappedBy = "loan", cascade = CascadeType.PERSIST)
+    @OrderBy("renewedAt ASC")
+    private List<LoanRenewal> renewalHistory = new ArrayList<>();
+
     /** Requerido por JPA; no usar directamente. */
     protected Loan() {
     }
@@ -95,28 +114,50 @@ public class Loan {
     }
 
     /**
-     * Renueva el préstamo: la fecha límite pasa a ser {@code today + days}, es decir, el usuario
-     * vuelve a tener el plazo completo contando desde hoy. Se registra cuántas veces se renovó.
+     * Renueva el préstamo: la fecha límite pasa a ser {@code hoy + days}, es decir, el usuario
+     * vuelve a tener el plazo completo contando desde hoy. La renovación queda en el historial
+     * con su fecha y hora.
      *
-     * @throws BusinessRuleException si ya fue devuelto, si está vencido (debe devolverse) o si
-     *                               ya tiene el plazo completo (renovar no cambiaría nada)
+     * @param now fecha y hora de la renovación
+     * @return la renovación registrada
+     * @throws BusinessRuleException si ya fue devuelto, si está vencido (debe devolverse), si ya
+     *                               se renovó hoy o si ya tiene el plazo completo (renovar no
+     *                               cambiaría nada)
      */
-    public void renew(LocalDate today, int days) {
+    public LoanRenewal renew(LocalDateTime now, int days) {
+        LocalDate today = now.toLocalDate();
         if (!isActive()) {
             throw new BusinessRuleException("El préstamo ya fue devuelto");
         }
         if (isOverdue(today)) {
             throw new BusinessRuleException(
-                    "No se puede renovar un préstamo vencido (venció el " + dueDate + "): debe devolverse");
+                    "No se puede renovar un préstamo vencido (venció el " + format(dueDate) + "): debe devolverse");
+        }
+        if (today.equals(lastRenewedOn)) {
+            String at = lastRenewedAt == null ? "" : " a las " + lastRenewedAt.format(TIME);
+            throw new BusinessRuleException("Este préstamo ya se renovó hoy" + at + " y vence el "
+                    + format(dueDate) + ". Podrá renovarse de nuevo a partir de mañana");
         }
         LocalDate newDueDate = today.plusDays(days);
         if (!newDueDate.isAfter(dueDate)) {
-            throw new BusinessRuleException(
-                    "El préstamo ya tiene el plazo completo: vence el " + dueDate);
+            String reason = today.equals(loanDate) ? "se registró hoy y ya tiene" : "ya tiene";
+            throw new BusinessRuleException("El préstamo " + reason + " el plazo completo (vence el "
+                    + format(dueDate) + "). Podrá renovarse a partir de mañana");
         }
+        LoanRenewal renewal = new LoanRenewal(this, now, dueDate, newDueDate);
+        renewalHistory.add(renewal);
         this.dueDate = newDueDate;
         this.renewals++;
         this.lastRenewedOn = today;
+        this.lastRenewedAt = now;
+        return renewal;
+    }
+
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+
+    private static String format(LocalDate date) {
+        return date.format(DATE);
     }
 
     public Long getId() { return id; }
@@ -127,6 +168,9 @@ public class Loan {
     public LocalDate getReturnDate() { return returnDate; }
     public int getRenewals() { return renewals; }
     public LocalDate getLastRenewedOn() { return lastRenewedOn; }
+    public LocalDateTime getLastRenewedAt() { return lastRenewedAt; }
+    /** Historial de solo lectura; carga perezosa: usar dentro de una transacción. */
+    public List<LoanRenewal> getRenewalHistory() { return Collections.unmodifiableList(renewalHistory); }
 
     @Override
     public boolean equals(Object o) {
